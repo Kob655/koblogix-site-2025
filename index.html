@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="KOBLOGIX : Expert en formation LaTeX, rédaction de thèses, mémoires, CV et rapports scientifiques. Services professionnels basés à Lomé, Togo." />
+    <meta name="keywords" content="LaTeX, Formation, Rédaction web, Thèse, Mémoire, CV, Scientifique, Togo, Lomé, Overleaf" />
+    <meta name="author" content="KOBLOGIX" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="KOBLOGIX - Formation LaTeX & Services Scientifiques" />
+    <meta property="og:description" content="Boostez votre carrière académique avec nos formations LaTeX et services de rédaction professionnelle." />
+    <meta property="og:image" content="https://placehold.co/1200x630/2D5BFF/ffffff?text=KOBLOGIX" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="KOBLOGIX - Formation LaTeX & Services" />
+    <meta property="twitter:description" content="Services de rédaction scientifique et formation LaTeX professionnelle." />
+
+    <title>KOBLOGIX - Formation LaTeX & Services de Rédaction Scientifique</title>
+    
+    <!-- Google Analytics placeholder -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      // gtag('config', 'G-YOUR-ID-HERE');
+    </script>
+
+    <!-- Tailwind CSS (CDN conservé pour la simplicité, mais idéalement à remplacer par un build CSS) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Poppins:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
+            },
+            colors: {
+              primary: {
+                DEFAULT: '#0077b6', // Bleu océan pro
+                dark: '#023e8a',
+                light: '#0096c7',
+              },
+              secondary: {
+                DEFAULT: '#FF6B35',
+                light: '#FF8C5A',
+              },
+              accent: {
+                DEFAULT: '#00D4AA',
+                dark: '#00B28A',
+              },
+              dark: '#2c3e50', // Gris bleuté foncé
+              bg: '#fdfbf7', // Blanc crème chaleureux
+            },
+            keyframes: {
+               fadeIn: {
+                 '0%': { opacity: '0' },
+                 '100%': { opacity: '1' },
+               },
+               slideUp: {
+                 '0%': { transform: 'translateY(20px)', opacity: '0' },
+                 '100%': { transform: 'translateY(0)', opacity: '1' },
+               },
+               blob: {
+                 "0%": { transform: "translate(0px, 0px) scale(1)" },
+                 "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                 "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                 "100%": { transform: "translate(0px, 0px) scale(1)" }
+               }
+            },
+            animation: {
+              fadeIn: 'fadeIn 0.5s ease-out',
+              slideUp: 'slideUp 0.6s ease-out forwards',
+              blob: "blob 7s infinite",
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 5px;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #475569;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "jspdf": "https://esm.sh/jspdf@^3.0.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "exceljs": "https://esm.sh/exceljs@^4.4.0",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.2",
+    "@emailjs/browser": "https://esm.sh/@emailjs/browser@^4.3.3",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-[#fdfbf7] text-[#2c3e50] dark:bg-slate-900 dark:text-gray-100 transition-colors duration-300">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
