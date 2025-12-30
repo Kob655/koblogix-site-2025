@@ -13,7 +13,7 @@ import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import CartSidebar from './components/CartSidebar';
 import AdminPanel from './components/AdminPanel';
-import { CheckoutModal } from './components/CheckoutModal';
+import CheckoutModal from './components/CheckoutModal';
 import Notifications from './components/Notifications';
 import SocialProof from './components/SocialProof';
 import BibtexGenerator from './components/BibtexGenerator';
