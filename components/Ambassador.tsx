@@ -1,123 +1,103 @@
+
 import React, { useState } from 'react';
-import { Gift, Users, Copy, Check, ArrowRight, Star } from 'lucide-react';
+import { Gift, Users, Copy, Check, ArrowRight, Star, Wallet, History, AlertCircle } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+// Fixed: formatPrice is exported from utils, not constants
 import { WHATSAPP_SUPPORT } from '../constants';
+import { formatPrice } from '../utils';
 
 const Ambassador: React.FC = () => {
-  const { currentUser } = useStore();
+  const { currentUser, becomeAmbassador } = useStore();
   const [email, setEmail] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const base = currentUser ? currentUser.name.substring(0, 3).toUpperCase() : (email.substring(0, 3).toUpperCase() || 'AMB');
-    const random = Math.floor(100 + Math.random() * 900);
-    setGeneratedCode(`${base}-${random}`);
+    if (!currentUser) return alert("Veuillez vous connecter d'abord.");
+    const code = `${currentUser.name.substring(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+    await becomeAmbassador(code);
   };
 
   const copyCode = () => {
-    navigator.clipboard.writeText(generatedCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (currentUser?.ambassadorCode) {
+      navigator.clipboard.writeText(currentUser.ambassadorCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
-    <section className="py-24 bg-gradient-to-br from-indigo-900 to-purple-900 text-white relative overflow-hidden">
-        {/* Background Patterns */}
-        <div className="absolute top-0 left-0 w-full h-full opacity-10">
-            <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full blur-3xl"></div>
-            <div className="absolute bottom-10 right-10 w-64 h-64 bg-pink-500 rounded-full blur-3xl"></div>
-        </div>
-
+    <section className="py-24 bg-gradient-to-br from-indigo-900 to-purple-900 text-white relative">
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-16">
             
             <div className="lg:w-1/2 text-center lg:text-left">
-                <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 border border-white/20 mb-6 backdrop-blur-sm">
+                <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 border border-white/20 mb-6">
                     <Star size={14} className="text-yellow-400 fill-yellow-400"/>
-                    <span className="text-xs font-bold uppercase tracking-wider">Programme Partenaire</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Programme Ambassadeur Transparent</span>
                 </div>
                 <h2 className="text-4xl md:text-5xl font-black font-serif mb-6 leading-tight">
-                    Devenez <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-pink-500">Ambassadeur</span> KOBLOGIX
+                    Gagnez <span className="text-yellow-400">1000 FCFA</span> par vente
                 </h2>
-                <p className="text-indigo-200 text-lg mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0">
-                    Gagnez de l'argent en recommandant nos formations. Pour chaque étudiant inscrit avec votre code, vous recevez une commission et il reçoit une réduction.
+                <p className="text-indigo-200 text-lg mb-8 max-w-xl">
+                    Chaque fois qu'un étudiant utilise votre code, il économise 1000F et vous gagnez 1000F. 
+                    Suivez vos gains en direct dans votre portefeuille.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
-                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                        <div className="p-3 bg-green-500/20 rounded-lg text-green-400"><Gift size={24}/></div>
-                        <div className="text-left">
-                            <div className="font-bold text-xl">-1000F</div>
-                            <div className="text-xs text-indigo-200">Pour votre filleul</div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                        <div className="p-3 bg-yellow-500/20 rounded-lg text-yellow-400"><Users size={24}/></div>
-                        <div className="text-left">
-                            <div className="font-bold text-xl">1000F</div>
-                            <div className="text-xs text-indigo-200">Cash pour vous</div>
-                        </div>
-                    </div>
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                    <h4 className="flex items-center gap-2 font-bold mb-4"><AlertCircle size={18} className="text-yellow-400"/> Comment ça marche ?</h4>
+                    <ul className="text-sm space-y-3 text-indigo-100 text-left">
+                        <li className="flex gap-2"><span>1.</span> Partagez votre code unique.</li>
+                        <li className="flex gap-2"><span>2.</span> Le client paye 1000F de moins sur le site.</li>
+                        <li className="flex gap-2"><span>3.</span> Dès validation du paiement par KOBLOGIX, votre solde est crédité.</li>
+                        <li className="flex gap-2"><span>4.</span> Retirez vos gains via T-Money/Flooz dès 5000F accumulés.</li>
+                    </ul>
                 </div>
             </div>
 
             <div className="lg:w-1/2 w-full max-w-md">
                 <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-2xl">
-                    {!generatedCode ? (
-                        <form onSubmit={handleGenerate} className="space-y-6">
-                            <h3 className="text-2xl font-bold text-center mb-2">Générez votre Code</h3>
-                            <p className="text-center text-sm text-indigo-200 mb-6">Commencez à parrainer dès aujourd'hui.</p>
-                            
-                            {!currentUser && (
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-indigo-300 mb-2">Votre Email</label>
-                                    <input 
-                                        type="email" 
-                                        required
-                                        value={email}
-                                        onChange={e => setEmail(e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder:text-white/30 outline-none focus:border-pink-500 transition-colors"
-                                        placeholder="exemple@email.com"
-                                    />
-                                </div>
-                            )}
-
-                            <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold py-4 rounded-xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                                Obtenir mon code <ArrowRight size={20}/>
-                            </button>
-                        </form>
-                    ) : (
-                        <div className="text-center animate-fadeIn">
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold mb-2">Votre Code Ambassadeur</h3>
-                                <p className="text-sm text-indigo-200">Partagez ce code avec vos amis.</p>
-                            </div>
-
-                            <div className="bg-black/30 border border-white/20 p-4 rounded-xl flex items-center justify-between gap-4 mb-6">
-                                <span className="font-mono text-2xl font-bold tracking-widest text-yellow-400 select-all">{generatedCode}</span>
-                                <button onClick={copyCode} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                                    {copied ? <Check size={20} className="text-green-400"/> : <Copy size={20}/>}
+                    {currentUser?.isAmbassador ? (
+                        <div className="space-y-8 animate-fadeIn">
+                            {/* Wallet Display */}
+                            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 p-6 rounded-2xl border border-yellow-500/30 text-center">
+                                <Wallet className="mx-auto mb-2 text-yellow-400" size={32}/>
+                                <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest">Solde Actuel</p>
+                                <p className="text-4xl font-black text-white mt-1">{formatPrice(currentUser.balance || 0)}</p>
+                                <button className="mt-4 text-xs font-black bg-white/10 hover:bg-white/20 px-6 py-2 rounded-full transition-all">
+                                    DEMANDER UN RETRAIT
                                 </button>
                             </div>
 
-                            <p className="text-xs text-indigo-300 mb-6">
-                                Contactez le support sur WhatsApp pour activer vos paiements.
-                            </p>
+                            <div className="space-y-4">
+                                <p className="text-center text-sm text-indigo-200">Votre Code de Parrainage :</p>
+                                <div className="bg-black/30 border border-white/20 p-5 rounded-xl flex items-center justify-between">
+                                    <span className="font-mono text-2xl font-bold tracking-widest text-yellow-400">{currentUser.ambassadorCode}</span>
+                                    <button onClick={copyCode} className="p-2 hover:bg-white/10 rounded-lg">
+                                        {copied ? <Check className="text-green-400"/> : <Copy size={20}/>}
+                                    </button>
+                                </div>
+                            </div>
 
                             <a 
-                                href={`https://wa.me/${WHATSAPP_SUPPORT}?text=Bonjour,+je+souhaite+activer+mon+compte+Ambassadeur+avec+le+code+${generatedCode}`}
+                                href={`https://wa.me/${WHATSAPP_SUPPORT}?text=Bonjour,+je+suis+l'ambassadeur+${currentUser.name}+et+je+souhaite+un+retrait+de+mon+solde.`}
                                 target="_blank"
-                                rel="noreferrer"
-                                className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition-colors"
+                                className="block w-full text-center bg-green-600 py-4 rounded-xl font-bold hover:bg-green-700 transition-all"
                             >
-                                Activer mon compte (WhatsApp)
+                                Contacter Support Retrait
                             </a>
-                            
-                            <button onClick={() => setGeneratedCode('')} className="mt-4 text-sm text-gray-400 hover:text-white underline">
-                                Générer un autre code
+                        </div>
+                    ) : (
+                        <div className="text-center py-6">
+                            <Users className="mx-auto mb-4 text-indigo-300" size={64}/>
+                            <h3 className="text-2xl font-bold mb-4">Prêt à commencer ?</h3>
+                            <button 
+                                onClick={handleGenerate}
+                                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black py-5 rounded-2xl shadow-xl hover:scale-105 transition-all"
+                            >
+                                ACTIVER MON CODE AMBASSADEUR
                             </button>
+                            <p className="mt-4 text-xs text-indigo-300">Nécessite d'être connecté à votre compte élève.</p>
                         </div>
                     )}
                 </div>

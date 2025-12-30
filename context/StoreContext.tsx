@@ -4,7 +4,7 @@ import { SessionInfo, Transaction, Notification, User } from '../types';
 import { SESSIONS_DATA as INITIAL_SESSIONS } from '../constants';
 import { db, isFirebaseConfigured } from '../firebase'; 
 import { 
-  collection, doc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot, query, orderBy, Timestamp, getDoc
+  collection, doc, addDoc, updateDoc, setDoc, onSnapshot, query, orderBy, Timestamp, getDocs, where, increment
 } from 'firebase/firestore';
 
 interface GlobalResources {
@@ -30,94 +30,73 @@ interface StoreContextType {
   saveAllGlobalResources: (data: GlobalResources) => Promise<void>;
   addTransaction: (t: Omit<Transaction, 'id' | 'status' | 'date'>) => Promise<void>;
   updateTransactionStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
-  uploadContract: (transactionId: string, url: string) => Promise<void>;
-  toggleCompletion: (id: string) => Promise<void>;
-  updateServiceProgress: (id: string, progress: number, fileData?: { name: string, url: string }) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
-  clearTransactions: () => Promise<void>;
-  regenerateCode: (id: string) => Promise<void>;
   addNotification: (message: string, type: 'success' | 'error' | 'info') => void;
   removeNotification: (id: string) => void;
   updateSession: (id: string, data: Partial<SessionInfo>) => Promise<void>;
-  resetSessionSeats: (id: string) => Promise<void>;
-  registerUser: (userData: Omit<User, 'id' | 'registeredAt'>) => void;
+  registerUser: (userData: Omit<User, 'id' | 'registeredAt' | 'balance'>) => void;
   loginUser: (email: string, pass: string) => boolean;
   logoutUser: () => void;
+  becomeAmbassador: (code: string) => Promise<void>;
+  verifyCoupon: (code: string) => Promise<{valid: boolean, ambassadorId?: string}>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Chargement des données initiales (LocalStorage ou Constants)
   const [sessions, setSessions] = useState<SessionInfo[]>(() => {
     const saved = localStorage.getItem('koblogix_sessions');
     return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
   });
+
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('koblogix_transactions');
     return saved ? JSON.parse(saved) : [];
   });
+
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('koblogix_users');
     return saved ? JSON.parse(saved) : [];
   });
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('koblogix_current_user');
     return saved ? JSON.parse(saved) : null;
   });
-  
+
   const [adminPassword, setAdminPassword] = useState('toujours plus haut');
-  const [globalResources, setGlobalResources] = useState<GlobalResources>(() => {
-    const saved = localStorage.getItem('koblogix_resources');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [globalResources, setGlobalResources] = useState<GlobalResources>({});
   const [isAdminOpen, setAdminOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  // Sauvegarde automatique dans LocalStorage pour la persistance hors-ligne
   useEffect(() => {
-    if (!isFirebaseConfigured || !db) return;
-    try {
-      const unsubscribe = onSnapshot(collection(db, "sessions"), (snapshot) => {
-        if (!snapshot.empty) {
-          const fetched = snapshot.docs.map(doc => doc.data() as SessionInfo);
-          setSessions(fetched.sort((a,b) => a.id.localeCompare(b.id)));
-        }
-      }, (err) => console.warn("Firestore sessions error (silent)"));
-      return () => unsubscribe();
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!isFirebaseConfigured || !db) return;
-    try {
-      const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-      return onSnapshot(q, (snapshot) => {
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-        setTransactions(fetched);
-        localStorage.setItem('koblogix_transactions', JSON.stringify(fetched));
-      }, (err) => console.warn("Firestore orders error (silent)"));
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (!isFirebaseConfigured || !db) return;
-    try {
-      return onSnapshot(doc(db, "settings", "global"), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data() as GlobalResources;
-          setGlobalResources(data);
-          if (data.adminPassword) setAdminPassword(data.adminPassword);
-        }
-      }, (err) => console.warn("Firestore settings error (silent)"));
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => localStorage.setItem('koblogix_users', JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem('koblogix_sessions', JSON.stringify(sessions)), [sessions]);
-  useEffect(() => localStorage.setItem('koblogix_resources', JSON.stringify(globalResources)), [globalResources]);
-  useEffect(() => {
+    localStorage.setItem('koblogix_sessions', JSON.stringify(sessions));
+    localStorage.setItem('koblogix_transactions', JSON.stringify(transactions));
+    localStorage.setItem('koblogix_users', JSON.stringify(users));
     if (currentUser) localStorage.setItem('koblogix_current_user', JSON.stringify(currentUser));
     else localStorage.removeItem('koblogix_current_user');
-  }, [currentUser]);
+  }, [sessions, transactions, users, currentUser]);
+
+  // Sync avec Firebase si configuré
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db) return;
+
+    const unsubOrders = onSnapshot(collection(db, "orders"), (s) => {
+      if (!s.empty) setTransactions(s.docs.map(d => ({id: d.id, ...d.data()} as Transaction)));
+    });
+
+    const unsubSessions = onSnapshot(collection(db, "sessions"), (s) => {
+      if (!s.empty) setSessions(s.docs.map(d => d.data() as SessionInfo));
+    });
+
+    const unsubSettings = onSnapshot(doc(db, "settings", "global"), (d) => {
+      if(d.exists()) setGlobalResources(d.data());
+    });
+
+    return () => { unsubOrders(); unsubSessions(); unsubSettings(); };
+  }, []);
 
   const addNotification = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
@@ -125,130 +104,110 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
   };
 
-  const removeNotification = (id: string) => setNotifications(prev => prev.filter(n => n.id !== id));
+  const verifyCoupon = async (code: string) => {
+    // Vérification d'abord en local pour la rapidité
+    const localAmbassador = users.find(u => u.ambassadorCode === code.toUpperCase());
+    if (localAmbassador) return { valid: true, ambassadorId: localAmbassador.id };
 
-  const addTransaction = async (t: Omit<Transaction, 'id' | 'status' | 'date'>) => {
-    const newTransaction: Transaction = {
-      ...t,
-      id: Date.now().toString(),
-      status: 'pending',
-      isCompleted: false,
-      date: new Date().toISOString().split('T')[0],
-      serviceProgress: 0,
-    };
-
-    // 1. Sauvegarde transaction locale
-    const updatedTransactions = [newTransaction, ...transactions];
-    setTransactions(updatedTransactions);
-    localStorage.setItem('koblogix_transactions', JSON.stringify(updatedTransactions));
-
-    // 2. LOGIQUE DE DÉCRÉMENTATION DES PLACES
-    const updatedSessions = [...sessions];
-    let sessionChanged = false;
-
-    t.items.forEach(item => {
-      if (item.sessionId) {
-        const sessionIndex = updatedSessions.findIndex(s => s.id === item.sessionId);
-        if (sessionIndex !== -1 && updatedSessions[sessionIndex].available > 0) {
-          updatedSessions[sessionIndex] = {
-            ...updatedSessions[sessionIndex],
-            available: updatedSessions[sessionIndex].available - 1
-          };
-          sessionChanged = true;
-
-          // Mise à jour Firebase pour la session (si configuré)
-          if (isFirebaseConfigured && db) {
-            setDoc(doc(db, "sessions", item.sessionId), updatedSessions[sessionIndex], { merge: true })
-              .catch(err => console.error("Erreur sync session Firebase:", err));
-          }
-        }
-      }
-    });
-
-    if (sessionChanged) {
-      setSessions(updatedSessions);
-      localStorage.setItem('koblogix_sessions', JSON.stringify(updatedSessions));
+    if (!isFirebaseConfigured || !db) return { valid: false };
+    const q = query(collection(db, "users"), where("ambassadorCode", "==", code.toUpperCase()));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return { valid: true, ambassadorId: snap.docs[0].id };
     }
+    return { valid: false };
+  };
 
-    // 3. Sauvegarde transaction Firebase
-    if (isFirebaseConfigured && db) {
-      addDoc(collection(db, "orders"), {
-        ...t,
-        status: 'pending',
-        isCompleted: false,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: Timestamp.now(),
-        serviceProgress: 0,
-      }).catch(err => console.error("Erreur backup Firebase:", err));
-    }
+  const becomeAmbassador = async (code: string) => {
+    if (!currentUser) return;
+    const updated = { ...currentUser, isAmbassador: true, ambassadorCode: code.toUpperCase(), balance: 0 };
     
-    addNotification('Commande enregistrée. Places mises à jour.', 'success');
+    // Mise à jour locale immédiate
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+
+    // Mise à jour Firebase si possible
+    if (isFirebaseConfigured && db) {
+      await setDoc(doc(db, "users", currentUser.id), updated, { merge: true });
+    }
+    addNotification("Vous êtes maintenant ambassadeur !", "success");
   };
 
   const updateTransactionStatus = async (id: string, status: 'approved' | 'rejected') => {
+    const transaction = transactions.find(t => t.id === id);
+    if (!transaction) return;
+
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = 'KOB-';
     for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
     
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status, code, codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000) } : t));
+    // Mise à jour locale
+    const updatedTransactions = transactions.map(t => 
+      t.id === id ? { ...t, status, code: status === 'approved' ? code : undefined } : t
+    );
+    setTransactions(updatedTransactions);
+
+    // Crédit commission
+    if (status === 'approved' && transaction.ambassadorId) {
+       setUsers(prev => prev.map(u => u.id === transaction.ambassadorId ? { ...u, balance: (u.balance || 0) + 1000 } : u));
+       if (isFirebaseConfigured && db) {
+         await updateDoc(doc(db, "users", transaction.ambassadorId), { balance: increment(1000) });
+       }
+    }
 
     if (isFirebaseConfigured && db) {
-      updateDoc(doc(db, "orders", id), { status, code, codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000) }).catch(() => {});
+      await updateDoc(doc(db, "orders", id), { 
+        status, 
+        code: status === 'approved' ? code : null,
+        codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000)
+      });
     }
+    addNotification(`Commande ${status === 'approved' ? 'validée' : 'rejetée'}.`, "info");
   };
 
-  const saveAllGlobalResources = async (data: GlobalResources) => {
-    setGlobalResources(data);
+  const addTransaction = async (t: Omit<Transaction, 'id' | 'status' | 'date'>) => {
+    const newT = { ...t, id: Date.now().toString(), status: 'pending' as const, date: new Date().toISOString().split('T')[0] };
+    setTransactions(prev => [newT, ...prev]);
+
     if (isFirebaseConfigured && db) {
-      setDoc(doc(db, "settings", "global"), data, { merge: true }).catch(() => {});
+      await addDoc(collection(db, "orders"), {
+        ...t,
+        status: 'pending',
+        date: new Date().toISOString().split('T')[0],
+        createdAt: Timestamp.now()
+      });
     }
+    addNotification("Commande envoyée. Validation en cours.", "success");
   };
 
-  const updateAdminPassword = async (newPass: string) => {
-    setAdminPassword(newPass);
-    if (isFirebaseConfigured && db) {
-      setDoc(doc(db, "settings", "global"), { adminPassword: newPass }, { merge: true }).catch(() => {});
-    }
-  };
-
-  const loginUser = (email: string, pass: string): boolean => {
+  const loginUser = (email: string, pass: string) => {
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
     if (user) {
       setCurrentUser(user);
-      addNotification(`Bienvenue, ${user.name} !`, 'success');
+      addNotification(`Bienvenue, ${user.name} !`, "success");
       return true;
     }
+    addNotification("Identifiants incorrects.", "error");
     return false;
   };
 
-  const registerUser = (userData: Omit<User, 'id' | 'registeredAt'>) => {
-    const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), registeredAt: new Date().toISOString() };
+  const registerUser = (u: any) => {
+    const newUser = { ...u, id: Date.now().toString(), registeredAt: new Date().toISOString(), balance: 0 };
     setUsers(prev => [...prev, newUser]);
     setCurrentUser(newUser);
-  };
-
-  const logoutUser = () => {
-    setCurrentUser(null);
-  };
-
-  const clearTransactions = async () => {
-    setTransactions([]);
-    localStorage.removeItem('koblogix_transactions');
+    addNotification("Compte créé avec succès !", "success");
   };
 
   return (
     <StoreContext.Provider value={{ 
-      sessions, transactions, notifications, users, currentUser, isAdminOpen, adminPassword, globalResources, 
-      setAdminOpen, updateAdminPassword, saveAllGlobalResources, addTransaction, updateTransactionStatus, 
-      uploadContract: async (id, url) => { setTransactions(prev => prev.map(t => t.id === id ? {...t, uploadedContractUrl: url} : t)); }, 
-      toggleCompletion: async (id) => { setTransactions(prev => prev.map(t => t.id === id ? {...t, isCompleted: !t.isCompleted} : t)); }, 
-      updateServiceProgress: async (id, progress, fileData) => { setTransactions(prev => prev.map(t => t.id === id ? {...t, serviceProgress: progress, deliveredFile: fileData ? {...fileData, deliveredAt: new Date().toISOString()} : undefined} : t)); }, 
-      deleteTransaction: async (id) => { setTransactions(prev => prev.filter(t => t.id !== id)); }, clearTransactions, 
-      regenerateCode: async (id) => { updateTransactionStatus(id, 'approved'); }, 
-      addNotification, removeNotification, 
-      updateSession: async (id, d) => { setSessions(prev => prev.map(s => s.id === id ? {...s, ...d} : s)); }, 
-      resetSessionSeats: async (id) => { setSessions(prev => prev.map(s => s.id === id ? {...s, available: s.total} : s)); }, 
-      registerUser, loginUser, logoutUser
+      sessions, transactions, notifications, users, currentUser, isAdminOpen, adminPassword, globalResources,
+      setAdminOpen, updateAdminPassword: async (p) => setAdminPassword(p), saveAllGlobalResources: async (d) => setGlobalResources(d),
+      addTransaction, updateTransactionStatus, deleteTransaction: async (id) => setTransactions(prev => prev.filter(t => t.id !== id)), 
+      addNotification, 
+      removeNotification: (id) => setNotifications(n => n.filter(x => x.id !== id)),
+      updateSession: async (id, data) => setSessions(prev => prev.map(s => s.id === id ? {...s, ...data} : s)), 
+      registerUser, loginUser, logoutUser: () => setCurrentUser(null),
+      becomeAmbassador, verifyCoupon
     }}>
       {children}
     </StoreContext.Provider>

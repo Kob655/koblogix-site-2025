@@ -36,26 +36,14 @@ export interface Transaction {
   codeExpiresAt?: number;
   items: CartItem[];
   serviceProgress?: number;
-  uploadedContractUrl?: string; // URL du contrat signé téléversé par l'utilisateur
+  couponUsed?: string; // Code promo utilisé
+  ambassadorId?: string; // ID de l'ambassadeur lié
+  uploadedContractUrl?: string;
   deliveredFile?: {
     name: string;
     url: string;
     deliveredAt: string;
   };
-}
-
-export interface SessionInfo {
-  id: string;
-  title: string;
-  dates: string;
-  available: number;
-  total: number;
-}
-
-export interface Notification {
-  id: string;
-  message: string;
-  type: 'success' | 'error' | 'info';
 }
 
 export interface User {
@@ -64,6 +52,10 @@ export interface User {
   email: string;
   password: string;
   registeredAt: string;
+  isAmbassador?: boolean;
+  ambassadorCode?: string;
+  balance: number; // Solde des commissions
+  withdrawals?: { amount: number, date: string, status: string }[];
 }
 
 export interface CustomerInfo {
@@ -72,4 +64,20 @@ export interface CustomerInfo {
   email: string;
   paymentMethod: 'tmoney' | 'flooz';
   paymentRef: string;
+}
+
+// Fixed missing SessionInfo interface
+export interface SessionInfo {
+  id: string;
+  title: string;
+  dates: string;
+  total: number;
+  available: number;
+}
+
+// Fixed missing Notification interface
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
 }
