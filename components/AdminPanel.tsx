@@ -12,18 +12,7 @@ import { useStore } from '../context/StoreContext';
 import { exportToExcel } from '../utils/exports';
 
 const AdminPanel: React.FC = () => {
-  const [isAuth, setIsAuth] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'sessions' | 'resources' | 'settings'>('dashboard');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  
-  // États de brouillon pour les inputs (évite les lags au collage)
-  const [draftLinks, setDraftLinks] = useState<any>(null);
-  const [newAdminPass, setNewAdminPass] = useState('');
-
+  // --- HOOKS AU DÉBUT ---
   const { 
     transactions, sessions, updateTransactionStatus, toggleCompletion, 
     deleteTransaction, clearTransactions, regenerateCode, isAdminOpen, 
@@ -31,20 +20,21 @@ const AdminPanel: React.FC = () => {
     updateAdminPassword, updateSession, resetSessionSeats, updateServiceProgress
   } = useStore();
 
+  const [isAuth, setIsAuth] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'sessions' | 'resources' | 'settings'>('dashboard');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [draftLinks, setDraftLinks] = useState<any>(null);
+  const [newAdminPass, setNewAdminPass] = useState('');
+
   useEffect(() => {
     if (currentTab === 'resources' && globalResources && !draftLinks) {
       setDraftLinks({ ...globalResources });
     }
   }, [currentTab, globalResources]);
-
-  const handleLogin = () => {
-    if (passwordInput === adminPassword) {
-      setIsAuth(true);
-      setLoginError('');
-    } else {
-      setLoginError("Mot de passe incorrect");
-    }
-  };
 
   const filteredData = useMemo(() => {
     return transactions.filter(t => {
@@ -65,6 +55,18 @@ const AdminPanel: React.FC = () => {
     return { revenue, pending: transactions.filter(t => t.status === 'pending').length, count: transactions.length, certified: approved.filter(t => t.isCompleted).length };
   }, [transactions]);
 
+  // --- FIN DES HOOKS ---
+  if (!isAdminOpen) return null;
+
+  const handleLogin = () => {
+    if (passwordInput === adminPassword) {
+      setIsAuth(true);
+      setLoginError('');
+    } else {
+      setLoginError("Mot de passe incorrect");
+    }
+  };
+
   const handleSaveLinks = async () => {
     if (draftLinks) await saveAllGlobalResources(draftLinks);
   };
@@ -74,8 +76,6 @@ const AdminPanel: React.FC = () => {
     await updateAdminPassword(newAdminPass);
     setNewAdminPass('');
   };
-
-  if (!isAdminOpen) return null;
 
   return (
     <Modal 
@@ -104,7 +104,6 @@ const AdminPanel: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6 animate-fadeIn">
-             {/* Navigation par Onglets */}
              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-100 dark:bg-slate-800 p-2 rounded-3xl">
                  <div className="flex gap-1 flex-wrap justify-center">
                      {[
@@ -123,7 +122,6 @@ const AdminPanel: React.FC = () => {
                  </button>
              </div>
 
-             {/* DASHBOARD TAB */}
              {currentTab === 'dashboard' && (
                  <div className="space-y-6 text-left">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -153,44 +151,34 @@ const AdminPanel: React.FC = () => {
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
                             <input 
-                              type="text" placeholder="Rechercher par nom, téléphone, réf..." value={searchTerm} 
+                              type="text" placeholder="Rechercher..." value={searchTerm} 
                               onChange={e => setSearchTerm(e.target.value)} 
                               className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-800 rounded-xl outline-none text-sm border-2 border-transparent focus:border-primary transition-all"
                             />
                         </div>
-                        <div className="flex gap-2">
-                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-gray-50 dark:bg-slate-800 p-3 rounded-xl text-xs font-black outline-none border border-gray-100 dark:border-slate-700">
-                                <option value="all">TOUS STATUTS</option>
-                                <option value="pending">EN ATTENTE</option>
-                                <option value="approved">VALIDÉS</option>
-                            </select>
-                            <button onClick={() => exportToExcel(transactions)} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg active:scale-95 transition-all">
-                                <Download size={18}/> EXPORTER EXCEL
-                            </button>
-                            <button onClick={() => { if(window.confirm("Voulez-vous vraiment vider tout l'historique ?")) clearTransactions(); }} className="bg-red-50 text-red-500 px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-red-100 transition-colors">
-                                <Trash2 size={18}/> VIDER
-                            </button>
-                        </div>
+                        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-gray-50 dark:bg-slate-800 p-3 rounded-xl text-xs font-black border border-gray-100 dark:border-slate-700">
+                            <option value="all">TOUS STATUTS</option>
+                            <option value="pending">EN ATTENTE</option>
+                            <option value="approved">VALIDÉS</option>
+                        </select>
+                        <button onClick={() => exportToExcel(transactions)} className="bg-blue-600 text-white px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg">
+                            <Download size={18}/> EXPORTER
+                        </button>
                     </div>
 
                     <div className="space-y-3">
                         {filteredData.map(t => (
-                            <div key={t.id} className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-5 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-xl transition-all group">
+                            <div key={t.id} className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-5 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div className="text-left flex-1 w-full">
                                     <div className="flex items-center gap-3 mb-2">
                                         <span className={`w-3 h-3 rounded-full ${t.status === 'approved' ? 'bg-green-500' : 'bg-orange-500'}`}></span>
                                         <h4 className="font-black text-lg">{t.name}</h4>
-                                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full uppercase font-black">{t.type}</span>
+                                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase">{t.type}</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4 text-xs text-gray-400 font-medium">
-                                        <div className="flex items-center gap-1"><Clock size={12}/> {t.date}</div>
-                                        <div className="flex items-center gap-1 font-mono uppercase tracking-widest"><Shield size={12}/> {t.paymentRef || 'N/A'}</div>
+                                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                                        <div className="flex items-center gap-1"><Clock size={12}/> {String(t.date)}</div>
+                                        <div className="font-mono uppercase tracking-widest font-bold text-gray-500">{t.paymentRef || 'N/A'}</div>
                                     </div>
-                                    {t.uploadedContractUrl && (
-                                        <div className="mt-2 text-[10px] font-black text-purple-500 bg-purple-50 dark:bg-purple-900/20 px-3 py-1 rounded-full w-fit flex items-center gap-2 border border-purple-100 dark:border-purple-800">
-                                            <FileCheck size={14}/> CONTRAT REÇU
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="text-right mr-4 font-mono">
@@ -199,15 +187,15 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                     <div className="flex gap-2">
                                         {t.status === 'pending' ? (
-                                            <button onClick={() => updateTransactionStatus(t.id, 'approved')} className="bg-green-600 hover:bg-green-700 text-white p-3.5 rounded-2xl shadow-lg active:scale-90 transition-all"><Check size={22}/></button>
+                                            <button onClick={() => updateTransactionStatus(t.id, 'approved')} className="bg-green-600 text-white p-3.5 rounded-2xl shadow-lg active:scale-90 transition-all"><Check size={22}/></button>
                                         ) : (
                                             <>
-                                                <button onClick={() => toggleCompletion(t.id)} className={`p-3.5 rounded-2xl transition-all shadow-lg active:scale-90 ${t.isCompleted ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 hover:text-purple-500'}`} title="Décerner Diplôme"><Award size={22}/></button>
-                                                <button onClick={() => { const u = prompt("URL du Fichier Livrable (Drive) :"); if(u) updateServiceProgress(t.id, 100, { name: "Document Livré", url: u }); }} className={`p-3.5 rounded-2xl transition-all shadow-lg active:scale-90 ${t.deliveredFile ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 hover:text-blue-500'}`} title="Livrer Travail"><UploadCloud size={22}/></button>
-                                                <button onClick={() => regenerateCode(t.id)} className="p-3.5 bg-gray-100 dark:bg-slate-800 text-gray-400 hover:text-primary rounded-2xl transition-all" title="Régénérer Code"><RefreshCw size={22}/></button>
+                                                <button onClick={() => toggleCompletion(t.id)} className={`p-3.5 rounded-2xl transition-all shadow-lg ${t.isCompleted ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-400'}`} title="Diplôme"><Award size={22}/></button>
+                                                <button onClick={() => { const u = prompt("URL du Drive :"); if(u) updateServiceProgress(t.id, 100, { name: "Document Livré", url: u }); }} className={`p-3.5 rounded-2xl transition-all shadow-lg ${t.deliveredFile ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`} title="Livrer"><UploadCloud size={22}/></button>
+                                                <button onClick={() => regenerateCode(t.id)} className="p-3.5 bg-gray-100 text-gray-400 hover:text-primary rounded-2xl transition-all"><RefreshCw size={22}/></button>
                                             </>
                                         )}
-                                        <button onClick={() => { if(window.confirm("Supprimer cette transaction ?")) deleteTransaction(t.id); }} className="p-3.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all"><Trash2 size={22}/></button>
+                                        <button onClick={() => { if(window.confirm("Supprimer ?")) deleteTransaction(t.id); }} className="p-3.5 text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 size={22}/></button>
                                     </div>
                                 </div>
                             </div>
@@ -216,7 +204,6 @@ const AdminPanel: React.FC = () => {
                  </div>
              )}
 
-             {/* SESSIONS TAB */}
              {currentTab === 'sessions' && (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
                     {sessions.map(session => {
@@ -228,24 +215,24 @@ const AdminPanel: React.FC = () => {
                                         <h4 className="font-black text-xl">{session.title}</h4>
                                         <p className="text-xs text-gray-500 font-bold">{session.dates}</p>
                                     </div>
-                                    <button onClick={() => exportToExcel(participants)} className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><Download size={20}/></button>
+                                    <button onClick={() => exportToExcel(participants)} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><Download size={20}/></button>
                                 </div>
                                 <div className="space-y-6 flex-1">
                                     <div>
                                         <div className="flex justify-between text-[10px] font-black mb-2 uppercase tracking-widest text-gray-400">
-                                            <span>Remplissage des places</span>
+                                            <span>Remplissage</span>
                                             <span className={session.available === 0 ? 'text-red-500' : 'text-green-600'}>{session.total - session.available} / {session.total}</span>
                                         </div>
-                                        <div className="w-full bg-gray-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden shadow-inner">
+                                        <div className="w-full bg-gray-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
                                             <div className={`h-full transition-all duration-1000 ${session.available === 0 ? 'bg-red-500' : 'bg-blue-600'}`} style={{width: `${((session.total - session.available) / session.total) * 100}%`}}></div>
                                         </div>
                                     </div>
                                     <div className="flex-1 bg-gray-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
-                                        <h5 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><Users size={14}/> Participants Validés ({participants.length})</h5>
+                                        <h5 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><Users size={14}/> Participants ({participants.length})</h5>
                                         <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                            {participants.length === 0 ? <p className="text-[10px] italic text-gray-400 py-4 text-center">Aucun inscrit pour le moment.</p> : 
+                                            {participants.length === 0 ? <p className="text-[10px] italic text-gray-400 py-4 text-center">Aucun inscrit.</p> : 
                                                 participants.map(p => (
-                                                    <div key={p.id} className="text-[11px] font-black p-3 bg-white dark:bg-slate-800 rounded-xl flex justify-between items-center shadow-sm border border-gray-50 dark:border-slate-700">
+                                                    <div key={p.id} className="text-[11px] font-black p-3 bg-white dark:bg-slate-800 rounded-xl flex justify-between items-center shadow-sm">
                                                         <span className="truncate">{p.name}</span>
                                                         <div className="flex gap-2">
                                                           {p.uploadedContractUrl && <FileCheck size={14} className="text-purple-500"/>}
@@ -256,12 +243,12 @@ const AdminPanel: React.FC = () => {
                                             }
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 pt-6 border-t border-gray-100 dark:border-slate-700 mt-auto">
-                                        <button onClick={() => resetSessionSeats(session.id)} className="flex-1 py-3 bg-gray-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black text-gray-500 hover:bg-gray-200 transition-colors uppercase tracking-widest">Reset Places</button>
+                                    <div className="flex gap-2 pt-6 mt-auto">
+                                        <button onClick={() => resetSessionSeats(session.id)} className="flex-1 py-3 bg-gray-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black text-gray-500 uppercase tracking-widest">Reset Places</button>
                                         <input 
                                             type="number" value={session.available} 
                                             onChange={(e) => updateSession(session.id, { available: parseInt(e.target.value) || 0 })}
-                                            className="w-20 bg-white dark:bg-slate-700 text-center py-3 rounded-2xl font-black text-sm border-2 border-transparent focus:border-primary outline-none transition-all"
+                                            className="w-20 bg-white dark:bg-slate-700 text-center py-3 rounded-2xl font-black text-sm border-2 border-transparent focus:border-primary outline-none"
                                         />
                                     </div>
                                 </div>
@@ -271,23 +258,22 @@ const AdminPanel: React.FC = () => {
                  </div>
              )}
 
-             {/* RESOURCES (LINKS) TAB */}
              {currentTab === 'resources' && draftLinks && (
                  <div className="max-w-4xl mx-auto space-y-8 text-left animate-slideUp">
                     <div className="bg-white dark:bg-slate-900 p-10 rounded-[4rem] border border-gray-100 dark:border-slate-800 shadow-xl relative overflow-hidden">
                         <div className="flex justify-between items-center mb-10">
-                            <h3 className="text-2xl font-black flex items-center gap-3"><Globe size={32}/> Liens des Ressources Globales</h3>
-                            <button onClick={handleSaveLinks} className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-[2rem] font-black text-sm flex items-center gap-3 shadow-xl active:scale-95 transition-all">
-                                <Save size={22}/> ENREGISTRER TOUS LES LIENS
+                            <h3 className="text-2xl font-black flex items-center gap-3"><Globe size={32}/> Ressources Globales</h3>
+                            <button onClick={handleSaveLinks} className="bg-green-600 text-white px-8 py-4 rounded-[2rem] font-black text-sm flex items-center gap-3 shadow-xl active:scale-95 transition-all">
+                                <Save size={22}/> ENREGISTRER
                             </button>
                         </div>
                         <div className="grid md:grid-cols-2 gap-8">
                             {[
-                                { label: "Fiche d'Inscription (Lien Drive)", key: "inscriptionUrl" },
-                                { label: "Contrat Type PDF (Lien Drive)", key: "contractUrl" },
-                                { label: "Pack Contenu Cours (Lien Drive)", key: "courseContentUrl" },
-                                { label: "Invitation Canal WhatsApp VIP", key: "whatsappLink" },
-                                { label: "Guide Installation Overleaf", key: "overleafGuideUrl" }
+                                { label: "Fiche Inscription", key: "inscriptionUrl" },
+                                { label: "Contrat Type", key: "contractUrl" },
+                                { label: "Contenu Cours", key: "courseContentUrl" },
+                                { label: "WhatsApp VIP", key: "whatsappLink" },
+                                { label: "Guide Overleaf", key: "overleafGuideUrl" }
                             ].map(res => (
                                 <div key={res.key} className="space-y-2">
                                     <label className="text-[11px] font-black uppercase text-gray-500 tracking-widest">{res.label}</label>
@@ -295,10 +281,10 @@ const AdminPanel: React.FC = () => {
                                       <input 
                                           type="text" value={draftLinks[res.key] || ''} 
                                           onChange={(e) => setDraftLinks({...draftLinks, [res.key]: e.target.value})}
-                                          className="w-full p-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border-2 border-transparent focus:border-primary outline-none transition-all text-xs font-mono shadow-inner"
-                                          placeholder="Collez le lien ici (Ctrl+V)..."
+                                          className="w-full p-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border-2 border-transparent focus:border-primary outline-none text-xs font-mono shadow-inner"
+                                          placeholder="Collez le lien..."
                                       />
-                                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"><LinkIcon size={18}/></div>
+                                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300"><LinkIcon size={18}/></div>
                                     </div>
                                 </div>
                             ))}
@@ -307,22 +293,21 @@ const AdminPanel: React.FC = () => {
                  </div>
              )}
 
-             {/* SETTINGS (SYSTEM) TAB */}
              {currentTab === 'settings' && (
                  <div className="max-w-xl mx-auto space-y-8 text-left animate-slideUp">
                     <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-gray-100 dark:border-slate-800 shadow-xl">
-                        <h3 className="text-2xl font-black flex items-center gap-3 mb-8"><Lock size={28}/> Paramètres du Système</h3>
+                        <h3 className="text-2xl font-black flex items-center gap-3 mb-8"><Lock size={28}/> Sécurité</h3>
                         <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-black uppercase text-gray-500 mb-2 block">Nouveau Mot de Passe Administrateur</label>
+                                <label className="text-xs font-black uppercase text-gray-500 mb-2 block">Nouveau Mot de Passe Admin</label>
                                 <input 
                                     type="text" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}
                                     placeholder="Ex: toujours plus haut"
-                                    className="w-full p-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border-2 border-transparent focus:border-primary outline-none transition-all font-bold"
+                                    className="w-full p-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border-2 border-transparent focus:border-primary outline-none font-bold"
                                 />
                             </div>
-                            <button onClick={handleUpdatePassword} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
-                                <Save size={20}/> ENREGISTRER LE NOUVEAU MOT DE PASSE
+                            <button onClick={handleUpdatePassword} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black shadow-lg flex items-center justify-center gap-2">
+                                <Save size={20}/> ENREGISTRER
                             </button>
                         </div>
                     </div>
@@ -331,7 +316,6 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
       </div>
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }`}</style>
     </Modal>
   );
 };
