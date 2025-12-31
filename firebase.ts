@@ -9,12 +9,12 @@ import { getStorage } from 'firebase/storage';
  * les valeurs ci-dessous par vos propres clés.
  */
 const firebaseConfig = {
-  apiKey: "VOTRE_API_KEY", // Remplacez par votre clé réelle
-  authDomain: "koblogix-platform.firebaseapp.com",
-  projectId: "koblogix-platform",
-  storageBucket: "koblogix-platform.appspot.com",
-  messagingSenderId: "VOTRE_ID",
-  appId: "VOTRE_APP_ID"
+  apiKey: "AIzaSyCVKVZZCw87xrLyWkF1uJaqzJ1v_ZPCDf4",
+  authDomain: "koblogix.firebaseapp.com",
+  projectId: "koblogix",
+  storageBucket: "koblogix.firebasestorage.app",
+  messagingSenderId: "1059133656016",
+  appId: "1:1059133656016:web:684a56716bd086e6cc47d5"
 };
 
 // Vérifie si l'utilisateur a configuré Firebase
