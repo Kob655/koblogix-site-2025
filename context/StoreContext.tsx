@@ -25,6 +25,7 @@ interface StoreContextType {
   isAdminOpen: boolean;
   adminPassword: string;
   globalResources: GlobalResources; 
+  isCloudSync: boolean;
   setAdminOpen: (isOpen: boolean) => void;
   updateAdminPassword: (newPass: string) => Promise<void>;
   saveAllGlobalResources: (data: GlobalResources) => Promise<void>;
@@ -73,6 +74,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [globalResources, setGlobalResources] = useState<GlobalResources>({});
   const [isAdminOpen, setAdminOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isCloudSync, setIsCloudSync] = useState(isFirebaseConfigured);
 
   useEffect(() => {
     localStorage.setItem('koblogix_sessions', JSON.stringify(sessions));
@@ -82,12 +84,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     else localStorage.removeItem('koblogix_current_user');
   }, [sessions, transactions, users, currentUser]);
 
+  // Synchronisation en temps réel avec Firebase
   useEffect(() => {
     if (!isFirebaseConfigured || !db) return;
 
     try {
-      const unsubOrders = onSnapshot(collection(db, "orders"), (s) => {
-        if (!s.empty) setTransactions(s.docs.map(d => ({id: d.id, ...d.data()} as Transaction)));
+      // Écouter les commandes (Transactions)
+      const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+      const unsubOrders = onSnapshot(qOrders, (s) => {
+        const cloudData = s.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
+        if (cloudData.length > 0) setTransactions(cloudData);
       });
 
       const unsubSessions = onSnapshot(collection(db, "sessions"), (s) => {
@@ -100,7 +106,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       return () => { unsubOrders(); unsubSessions(); unsubSettings(); };
     } catch (e) {
-      console.error("Firebase sync error:", e);
+      console.error("Erreur de synchronisation Cloud:", e);
+      setIsCloudSync(false);
     }
   }, []);
 
@@ -110,18 +117,79 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
   };
 
+  const addTransaction = async (t: Omit<Transaction, 'id' | 'status' | 'date'>) => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    if (isFirebaseConfigured && db) {
+      try {
+        await addDoc(collection(db, "orders"), {
+          ...t,
+          status: 'pending',
+          date: dateStr,
+          createdAt: Timestamp.now(),
+          isCompleted: false
+        });
+        addNotification("Commande enregistrée sur le cloud.", "success");
+      } catch (error) {
+        console.error("Erreur d'envoi Cloud:", error);
+        addNotification("Erreur Cloud. Commande enregistrée localement uniquement.", "error");
+        // Fallback local en cas d'erreur cloud
+        const newT = { ...t as any, id: Date.now().toString(), status: 'pending', date: dateStr };
+        setTransactions(prev => [newT, ...prev]);
+      }
+    } else {
+      // Mode 100% Local
+      const newT = { ...t as any, id: Date.now().toString(), status: 'pending', date: dateStr };
+      setTransactions(prev => [newT, ...prev]);
+      addNotification("Enregistré sur cet appareil (Mode Hors-ligne).", "info");
+    }
+  };
+
+  const updateTransactionStatus = async (id: string, status: 'approved' | 'rejected') => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'KOB-';
+    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    
+    if (isFirebaseConfigured && db) {
+      try {
+        const orderRef = doc(db, "orders", id);
+        await updateDoc(orderRef, { 
+          status, 
+          code: status === 'approved' ? code : null,
+          codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000)
+        });
+      } catch(e) { console.error(e); }
+    } else {
+      setTransactions(prev => prev.map(t => 
+        t.id === id ? { ...t, status, code: status === 'approved' ? code : undefined } : t
+      ));
+    }
+    addNotification(`Commande mise à jour.`, "info");
+  };
+
+  const toggleCompletion = async (id: string) => {
+    const t = transactions.find(x => x.id === id);
+    if (!t) return;
+    const newStatus = !t.isCompleted;
+
+    if (isFirebaseConfigured && db) {
+      await updateDoc(doc(db, "orders", id), { isCompleted: newStatus });
+    } else {
+      setTransactions(prev => prev.map(item => item.id === id ? { ...item, isCompleted: newStatus } : item));
+    }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (isFirebaseConfigured && db) {
+        // Optionnel : supprimer aussi sur Firebase, mais souvent on préfère garder une trace
+        // Pour cet exemple on filtre simplement le state local
+    }
+    setTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
   const verifyCoupon = async (code: string) => {
     const localAmbassador = users.find(u => u.ambassadorCode === code.toUpperCase());
     if (localAmbassador) return { valid: true, ambassadorId: localAmbassador.id };
-
-    if (!isFirebaseConfigured || !db) return { valid: false };
-    try {
-      const q = query(collection(db, "users"), where("ambassadorCode", "==", code.toUpperCase()));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        return { valid: true, ambassadorId: snap.docs[0].id };
-      }
-    } catch (e) { console.error(e); }
     return { valid: false };
   };
 
@@ -130,149 +198,44 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const updated = { ...currentUser, isAmbassador: true, ambassadorCode: code.toUpperCase(), balance: 0 };
     setCurrentUser(updated);
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
-
-    if (isFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "users", currentUser.id), updated, { merge: true }); } catch(e){}
-    }
     addNotification("Programme ambassadeur activé !", "success");
-  };
-
-  const updateTransactionStatus = async (id: string, status: 'approved' | 'rejected') => {
-    const transaction = transactions.find(t => t.id === id);
-    if (!transaction) return;
-
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'KOB-';
-    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-    
-    setTransactions(prev => prev.map(t => 
-      t.id === id ? { ...t, status, code: status === 'approved' ? code : undefined } : t
-    ));
-
-    if (status === 'approved' && transaction.ambassadorId) {
-       setUsers(prev => prev.map(u => u.id === transaction.ambassadorId ? { ...u, balance: (u.balance || 0) + 1000 } : u));
-       if (isFirebaseConfigured && db) {
-         try { await updateDoc(doc(db, "users", transaction.ambassadorId), { balance: increment(1000) }); } catch(e){}
-       }
-    }
-
-    if (isFirebaseConfigured && db) {
-      try {
-        await updateDoc(doc(db, "orders", id), { 
-          status, 
-          code: status === 'approved' ? code : null,
-          codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000)
-        });
-      } catch(e){}
-    }
-    addNotification(`Commande ${status === 'approved' ? 'validée' : 'rejetée'}.`, "info");
-  };
-
-  const addTransaction = async (t: Omit<Transaction, 'id' | 'status' | 'date'>) => {
-    const newT: Transaction = { 
-      ...t as any, 
-      id: Date.now().toString(), 
-      status: 'pending' as const, 
-      date: new Date().toISOString().split('T')[0] 
-    };
-    
-    // Mise à jour locale immédiate pour réactivité de l'UI
-    setTransactions(prev => [newT, ...prev]);
-
-    // Envoi vers Firebase avec un délai maximum pour ne pas bloquer l'UI
-    if (isFirebaseConfigured && db) {
-      try {
-        const docPromise = addDoc(collection(db, "orders"), {
-          ...t,
-          status: 'pending',
-          date: new Date().toISOString().split('T')[0],
-          createdAt: Timestamp.now()
-        });
-        
-        // Timeout de 3 secondes pour ne pas bloquer l'utilisateur si Firebase est lent
-        await Promise.race([
-            docPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase Timeout")), 3000))
-        ]);
-      } catch (error) {
-        console.warn("Firebase addDoc deferred or timed out, transaction kept locally.");
-      }
-    }
-    addNotification("Paiement envoyé. Vérification en cours.", "success");
-  };
-
-  const loginUser = (email: string, pass: string) => {
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
-    if (user) {
-      setCurrentUser(user);
-      addNotification(`Bienvenue, ${user.name} !`, "success");
-      return true;
-    }
-    addNotification("Identifiants incorrects.", "error");
-    return false;
   };
 
   const registerUser = (u: any) => {
     const newUser = { ...u, id: Date.now().toString(), registeredAt: new Date().toISOString(), balance: 0 };
     setUsers(prev => [...prev, newUser]);
     setCurrentUser(newUser);
-    addNotification("Compte créé avec succès !", "success");
+    addNotification("Profil créé !", "success");
   };
 
-  const toggleCompletion = async (id: string) => {
-    const t = transactions.find(x => x.id === id);
-    if (!t) return;
-    const newStatus = !t.isCompleted;
-    setTransactions(prev => prev.map(item => item.id === id ? { ...item, isCompleted: newStatus } : item));
-    if (isFirebaseConfigured && db) {
-      try { await updateDoc(doc(db, "orders", id), { isCompleted: newStatus }); } catch(e){}
+  const loginUser = (email: string, pass: string) => {
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
+    if (user) {
+      setCurrentUser(user);
+      addNotification(`Heureux de vous revoir !`, "success");
+      return true;
     }
+    return false;
   };
 
-  const clearTransactions = async () => {
-    setTransactions([]);
-    addNotification("Historique vidé localement.", "info");
+  const clearTransactions = async () => { setTransactions([]); };
+  const regenerateCode = async (id: string) => { 
+     const code = 'KOB-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+     if (isFirebaseConfigured && db) await updateDoc(doc(db, "orders", id), { code });
   };
-
-  const regenerateCode = async (id: string) => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'KOB-';
-    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, code } : t));
-    if (isFirebaseConfigured && db) {
-      try { await updateDoc(doc(db, "orders", id), { code }); } catch(e){}
-    }
+  const resetSessionSeats = async (id: string) => { 
+     if (isFirebaseConfigured && db) await updateDoc(doc(db, "sessions", id), { available: 15 });
   };
-
-  const resetSessionSeats = async (id: string) => {
-    const session = INITIAL_SESSIONS.find(s => s.id === id);
-    if (session) {
-      setSessions(prev => prev.map(s => s.id === id ? { ...s, available: session.total } : s));
-      if (isFirebaseConfigured && db) {
-        try { await updateDoc(doc(db, "sessions", id), { available: session.total }); } catch(e){}
-      }
-    }
-  };
-
-  const updateServiceProgress = async (id: string, progress: number, deliveredFile?: any) => {
-    const updateData: any = { serviceProgress: progress };
-    if (deliveredFile) {
-      updateData.deliveredFile = { ...deliveredFile, deliveredAt: new Date().toISOString() };
-    }
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updateData } : t));
-    if (isFirebaseConfigured && db) {
-      try { await updateDoc(doc(db, "orders", id), updateData); } catch(e){}
-    }
-    addNotification("Statut de livraison mis à jour.", "success");
+  const updateServiceProgress = async (id: string, progress: number, file?: any) => {
+     if (isFirebaseConfigured && db) await updateDoc(doc(db, "orders", id), { serviceProgress: progress, deliveredFile: file });
   };
 
   return (
     <StoreContext.Provider value={{ 
-      sessions, transactions, notifications, users, currentUser, isAdminOpen, adminPassword, globalResources,
+      sessions, transactions, notifications, users, currentUser, isAdminOpen, adminPassword, globalResources, isCloudSync,
       setAdminOpen, updateAdminPassword: async (p) => setAdminPassword(p), saveAllGlobalResources: async (d) => setGlobalResources(d),
-      addTransaction, updateTransactionStatus, deleteTransaction: async (id) => setTransactions(prev => prev.filter(t => t.id !== id)), 
-      addNotification, 
-      removeNotification: (id) => setNotifications(n => n.filter(x => x.id !== id)),
+      addTransaction, updateTransactionStatus, deleteTransaction, 
+      addNotification, removeNotification: (id) => setNotifications(n => n.filter(x => x.id !== id)),
       updateSession: async (id, data) => setSessions(prev => prev.map(s => s.id === id ? {...s, ...data} : s)), 
       registerUser, loginUser, logoutUser: () => setCurrentUser(null),
       becomeAmbassador, verifyCoupon, toggleCompletion, clearTransactions, regenerateCode, resetSessionSeats, updateServiceProgress
