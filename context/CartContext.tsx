@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { CartItem } from '../types';
 
@@ -11,6 +12,8 @@ interface CartContextType {
   setIsOpen: (isOpen: boolean) => void;
   checkoutModalOpen: boolean;
   setCheckoutModalOpen: (isOpen: boolean) => void;
+  checkoutItem: CartItem | null;
+  setCheckoutItem: (item: CartItem | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -23,6 +26,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const [isOpen, setIsOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutItem, setCheckoutItem] = useState<CartItem | null>(null);
 
   useEffect(() => {
     localStorage.setItem('koblogix_cart', JSON.stringify(items));
@@ -57,7 +61,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isOpen, 
       setIsOpen,
       checkoutModalOpen,
-      setCheckoutModalOpen
+      setCheckoutModalOpen,
+      checkoutItem,
+      setCheckoutItem
     }}>
       {children}
     </CartContext.Provider>

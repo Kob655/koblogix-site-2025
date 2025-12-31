@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Lock, Download, FileText, Video, CheckCircle, FileCheck, Copy, Check, Clock, LogOut, Award, ChevronRight, Briefcase, ExternalLink, AlertCircle, Laptop, Sparkles, BrainCircuit, Search, FileCode, Layers, BookOpen, UploadCloud, Link } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Download, FileText, Video, CheckCircle, FileCheck, Copy, Check, Clock, LogOut, Award, ChevronRight, Briefcase, ExternalLink, AlertCircle, Laptop, Sparkles, BrainCircuit, Search, FileCode, Layers, BookOpen, UploadCloud, Link, Timer } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { generateReceipt } from '../utils/exports';
 import { AI_PACK_CONTENT } from '../constants/aiContent';
@@ -12,8 +12,36 @@ const Resources: React.FC = () => {
   const [error, setError] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<string>('');
   
-  const { transactions, currentUser, globalResources, uploadContract } = useStore();
+  const { transactions, currentUser, globalResources } = useStore();
+
+  // Gestion du compte à rebours pour l'expiration du code
+  useEffect(() => {
+    if (!unlockedTransaction?.codeExpiresAt) {
+        setTimeLeft('');
+        return;
+    }
+
+    const timer = setInterval(() => {
+        const now = Date.now();
+        const diff = unlockedTransaction.codeExpiresAt - now;
+
+        if (diff <= 0) {
+            setTimeLeft('EXPIRÉ');
+            setUnlockedTransaction(null);
+            setError('Votre code d\'accès a expiré.');
+            clearInterval(timer);
+        } else {
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+        }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [unlockedTransaction]);
 
   const handleUnlock = (manualCode?: string) => {
     setError('');
@@ -29,20 +57,6 @@ const Resources: React.FC = () => {
     } else {
       setError("Code invalide ou expiré.");
     }
-  };
-
-  const handleContractUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !unlockedTransaction) return;
-    
-    setIsUploading(true);
-    // Simuler un upload vers Firebase Storage
-    // Dans une version réelle, on utiliserait ref() et uploadBytes()
-    const fakeUrl = "https://firebasestorage.googleapis.com/v0/b/contract-signed.pdf";
-    
-    setTimeout(async () => {
-      await uploadContract(unlockedTransaction.id, fakeUrl);
-      setIsUploading(false);
-    }, 1500);
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -68,11 +82,19 @@ const Resources: React.FC = () => {
 
   const renderAIPackDashboard = () => (
     <div className="space-y-10 animate-slideUp">
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[2rem] text-white shadow-xl">
-            <h3 className="text-2xl font-black mb-2 flex items-center gap-3">
-                <BrainCircuit size={32}/> Votre Pack IA Premium
-            </h3>
-            <p className="text-blue-100 text-sm">Bienvenue dans votre nouvel arsenal de recherche. Utilisez ces ressources stratégiquement pour vos thèses et articles.</p>
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
+            <div className="relative z-10">
+                <h3 className="text-2xl font-black mb-2 flex items-center gap-3">
+                    <BrainCircuit size={32}/> Votre Pack IA Premium
+                </h3>
+                <p className="text-blue-100 text-sm">Bienvenue dans votre nouvel arsenal de recherche. Utilisez ces ressources stratégiquement pour vos thèses et articles.</p>
+            </div>
+            {timeLeft && (
+                <div className="absolute top-4 right-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 flex items-center gap-2">
+                    <Timer size={16} className="text-yellow-400 animate-pulse"/>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{timeLeft}</span>
+                </div>
+            )}
         </div>
 
         {/* AI Tool Library */}
@@ -149,9 +171,15 @@ const Resources: React.FC = () => {
         <div className="animate-slideUp w-full max-w-4xl mx-auto space-y-8">
             <div className="flex justify-between items-center border-b border-white/10 pb-6">
                 <button onClick={() => setUnlockedTransaction(null)} className="text-gray-400 hover:text-white text-sm">← Retour</button>
-                <div className="flex gap-2">
+                <div className="flex gap-4 items-center">
+                    {timeLeft && (
+                         <div className="flex items-center gap-2 text-yellow-400 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+                            <Timer size={14}/>
+                            <span className="text-[10px] font-black">{timeLeft}</span>
+                         </div>
+                    )}
                     <button onClick={() => generateReceipt(unlockedTransaction)} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2">
-                        <FileCheck size={16} /> Reçu de Paiement
+                        <FileCheck size={16} /> Reçu
                     </button>
                 </div>
             </div>
@@ -167,7 +195,7 @@ const Resources: React.FC = () => {
                         </div>
                     </div>
                     <a href={unlockedTransaction.deliveredFile.url} target="_blank" className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-green-500/20">
-                        Télécharger maintenant
+                        Télécharger
                     </a>
                 </div>
             )}
@@ -178,31 +206,13 @@ const Resources: React.FC = () => {
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Documents Administratifs</h4>
                     <div className="grid gap-3">
                         <a href={globalResources.inscriptionUrl} target="_blank" className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between hover:bg-white/10 transition-colors">
-                            <div className="flex items-center gap-3"><FileText size={20} className="text-blue-400"/> <span className="text-sm font-bold">Télécharger Fiche d'Inscription</span></div>
+                            <div className="flex items-center gap-3"><FileText size={20} className="text-blue-400"/> <span className="text-sm font-bold">Fiche d'Inscription</span></div>
                             <Download size={16} className="text-gray-500"/>
                         </a>
                         <a href={globalResources.contractUrl} target="_blank" className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between hover:bg-white/10 transition-colors">
-                            <div className="flex items-center gap-3"><Briefcase size={20} className="text-purple-400"/> <span className="text-sm font-bold">Télécharger Contrat de Formation</span></div>
+                            <div className="flex items-center gap-3"><Briefcase size={20} className="text-purple-400"/> <span className="text-sm font-bold">Contrat de Formation</span></div>
                             <Download size={16} className="text-gray-500"/>
                         </a>
-
-                        {/* ZONE UPLOAD CONTRAT */}
-                        <div className="mt-4 p-5 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center text-center">
-                            <UploadCloud size={32} className="text-primary mb-2" />
-                            <h5 className="text-sm font-bold mb-1">Téléverser le Contrat Signé (PDF)</h5>
-                            <p className="text-[10px] text-gray-500 mb-4">Obligatoire pour la validation finale du dossier.</p>
-                            
-                            {unlockedTransaction.uploadedContractUrl ? (
-                                <div className="flex items-center gap-2 text-green-500 font-bold text-xs bg-green-500/10 px-4 py-2 rounded-full">
-                                    <CheckCircle size={14}/> Reçu par l'administration
-                                </div>
-                            ) : (
-                                <label className="cursor-pointer bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
-                                    {isUploading ? <><Clock size={14} className="animate-spin"/> Patientez...</> : <><UploadCloud size={14}/> Sélectionner le PDF</>}
-                                    <input type="file" accept=".pdf" className="hidden" onChange={handleContractUpload} disabled={isUploading} />
-                                </label>
-                            )}
-                        </div>
                     </div>
                 </div>
 
@@ -215,7 +225,7 @@ const Resources: React.FC = () => {
                           target="_blank" 
                           className={`p-4 rounded-xl border border-white/10 flex items-center justify-between transition-colors ${isFull ? 'bg-purple-500/10 hover:bg-purple-500/20' : 'opacity-40 cursor-not-allowed pointer-events-none'}`}
                         >
-                            <div className="flex items-center gap-3"><Video size={20} className="text-purple-400"/> <span className="text-sm font-bold">Pack Cours & Drive Premium</span></div>
+                            <div className="flex items-center gap-3"><Video size={20} className="text-purple-400"/> <span className="text-sm font-bold">Pack Cours Drive</span></div>
                             {isFull ? <ExternalLink size={16}/> : <Lock size={16}/>}
                         </a>
                         <a 
@@ -223,26 +233,10 @@ const Resources: React.FC = () => {
                           target="_blank" 
                           className={`p-4 rounded-xl border border-white/10 flex items-center justify-between transition-colors ${isFull ? 'bg-green-500/10 hover:bg-green-500/20' : 'opacity-40 cursor-not-allowed pointer-events-none'}`}
                         >
-                            <div className="flex items-center gap-3"><Link size={20} className="text-green-400"/> <span className="text-sm font-bold">Lien Canal WhatsApp VIP</span></div>
-                            {isFull ? <ExternalLink size={16}/> : <Lock size={16}/>}
-                        </a>
-                        <a 
-                          href={globalResources.overleafGuideUrl} 
-                          target="_blank" 
-                          className={`p-4 rounded-xl border border-white/10 flex items-center justify-between transition-colors ${isFull ? 'bg-blue-500/10 hover:bg-blue-500/20' : 'opacity-40 cursor-not-allowed pointer-events-none'}`}
-                        >
-                            <div className="flex items-center gap-3"><Laptop size={20} className="text-blue-400"/> <span className="text-sm font-bold">Guide Installation Overleaf</span></div>
+                            <div className="flex items-center gap-3"><Link size={20} className="text-green-400"/> <span className="text-sm font-bold">Canal WhatsApp VIP</span></div>
                             {isFull ? <ExternalLink size={16}/> : <Lock size={16}/>}
                         </a>
                     </div>
-                    {!isFull && (
-                        <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl flex items-start gap-3 mt-4">
-                            <AlertCircle size={18} className="text-orange-500 shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-orange-400 leading-relaxed font-bold">
-                                Note : Le contenu du cours et le canal WhatsApp sont réservés aux inscrits en formation complète. Régularisez votre paiement pour y accéder.
-                            </p>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -254,7 +248,7 @@ const Resources: React.FC = () => {
                     <button onClick={() => generateCertificate(unlockedTransaction.name, unlockedTransaction.date)} className="bg-white text-blue-900 px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 mx-auto shadow-lg hover:scale-105 transition-all">
                         <Download size={20}/> Télécharger mon Certificat
                     </button>
-                ) : <p className="text-xs text-orange-400 font-bold uppercase tracking-widest">En attente de validation finale de votre formation par l'administration.</p>}
+                ) : <p className="text-xs text-orange-400 font-bold uppercase tracking-widest">En attente de validation finale de votre formation.</p>}
             </div>
         </div>
     );
@@ -265,7 +259,7 @@ const Resources: React.FC = () => {
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold font-serif mb-4">Espace Ressources <span className="text-primary">&</span> Travaux</h2>
-          <p className="text-gray-400">Accédez à vos outils, cours et documents administratifs.</p>
+          <p className="text-gray-400">Accédez à vos outils, cours et documents.</p>
         </div>
 
         <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/10">
@@ -283,7 +277,12 @@ const Resources: React.FC = () => {
                                                {t.items[0]?.name}
                                                {t.type === 'ai_pack' && <Sparkles size={14} className="text-purple-400"/>}
                                            </div>
-                                           <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{t.date} • {t.status === 'approved' ? <span className="text-green-500">Validé</span> : 'Vérification...'}</div>
+                                           <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">
+                                                {t.date} • {t.status === 'approved' ? <span className="text-green-500">Validé</span> : 'Vérification...'}
+                                                {t.codeExpiresAt && t.status === 'approved' && (
+                                                    <span className="ml-2 text-yellow-500"> • Expire bientôt</span>
+                                                )}
+                                           </div>
                                        </div>
                                        {t.status === 'approved' ? (
                                            <button onClick={() => handleUnlock(t.code)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/10 active:scale-95 transition-all">
