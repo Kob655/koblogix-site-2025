@@ -1,14 +1,9 @@
-
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 /**
- * CONFIGURATION OBLIGATOIRE POUR VOIR LES COMMANDES PARTOUT
- * 1. Allez sur https://console.firebase.google.com/
- * 2. Créez un projet nommé "Koblogix"
- * 3. Allez dans "Paramètres du projet" > "Applications" > "Ajouter une application Web"
- * 4. Copiez l'objet firebaseConfig ci-dessous.
+ * CONFIGURATION KOBLOGIX RÉELLE
  */
 const firebaseConfig = {
   apiKey: "AIzaSyCVKVZZCw87xrLyWkF1uJaqzJ1v_ZPCDf4",
@@ -19,9 +14,9 @@ const firebaseConfig = {
   appId: "1:1059133656016:web:684a56716bd086e6cc47d5"
 };
 
-// Détection automatique : Si la clé commence par "VOTRE_", le mode cloud est désactivé
+// Détection automatique : Si la clé est valide, le mode cloud est activé
 export const isFirebaseConfigured = 
-  firebaseConfig.apiKey !== "VOTRE_API_KEY" && 
+  firebaseConfig.apiKey && 
   firebaseConfig.apiKey.trim().length > 10;
 
 let app;
