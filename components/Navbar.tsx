@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Menu, X, Moon, Sun } from 'lucide-react';
+import { ShoppingCart, Menu, X, Moon, Sun, LogOut, User as UserIcon } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
+import { useStore } from '../context/StoreContext';
+import { smoothScrollTo } from '../utils';
 
 const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { items, setIsOpen } = useCart();
   const { theme, toggleTheme } = useTheme();
+  const { currentUser, logoutUser } = useStore();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -25,50 +26,41 @@ const Navbar: React.FC = () => {
     { name: 'Contact', href: '#contact' },
   ];
 
-  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const handleScroll = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
-    const targetId = href.replace('#', '');
-    const element = document.getElementById(targetId);
-    if (element) {
-      const offset = 80;
-      const bodyRect = document.body.getBoundingClientRect().top;
-      const elementRect = element.getBoundingClientRect().top;
-      const elementPosition = elementRect - bodyRect;
-      const offsetPosition = elementPosition - offset;
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-    }
+    smoothScrollTo(href.replace('#', ''));
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${isScrolled ? 'py-4' : 'py-6'}`}>
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 ${isScrolled ? 'py-4' : 'py-8'}`}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         
-        {/* Logo */}
-        <div className="flex items-center gap-3 group cursor-pointer" onClick={(e) => scrollToSection(e as any, '#accueil')}>
-          <div className="h-10 w-10 md:h-11 md:w-11 bg-blue-600 text-white flex items-center justify-center text-xl md:text-2xl font-black rounded-xl font-serif shadow-lg group-hover:rotate-6 transition-transform">
+        {/* Logo KOB LOGIX */}
+        <div className="flex items-center gap-4 group cursor-pointer" onClick={(e) => handleScroll(e as any, '#accueil')}>
+          <div className="h-14 w-14 bg-[#2563EB] text-white flex items-center justify-center text-3xl font-black rounded-2xl font-serif shadow-xl group-hover:rotate-6 transition-transform">
             K
           </div>
           <div className="flex flex-col">
-            <span className="font-serif text-xl md:text-2xl font-black text-slate-800 dark:text-white leading-tight">
+            <span className="font-serif text-2xl font-black text-slate-800 dark:text-white leading-tight uppercase tracking-tight">
               KOB
             </span>
-            <span className="text-secondary text-[10px] md:text-xs tracking-[0.2em] font-bold -mt-1">
+            <span className="text-[#F59E0B] text-xs tracking-[0.4em] font-black -mt-1 uppercase">
               LOGIX
             </span>
           </div>
         </div>
 
-        {/* Pill Menu (Centré et stylisé comme sur l'image) */}
-        <div className="hidden md:flex items-center gap-6">
-          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-2 py-2 rounded-full shadow-sm">
-            <ul className="flex items-center gap-1">
+        {/* Menu Pillule Centré */}
+        <div className="hidden lg:flex items-center gap-10">
+          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-100 dark:border-slate-800 px-4 py-2 rounded-full shadow-lg">
+            <ul className="flex items-center">
               {navLinks.map((link) => (
                 <li key={link.name}>
                   <a 
                     href={link.href}
-                    onClick={(e) => scrollToSection(e, link.href)}
-                    className="px-5 py-2 rounded-full font-medium text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all duration-300"
+                    onClick={(e) => handleScroll(e, link.href)}
+                    className="px-6 py-2.5 rounded-full font-bold text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
                   >
                     {link.name}
                   </a>
@@ -77,21 +69,45 @@ const Navbar: React.FC = () => {
             </ul>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            {/* User Account / Logout */}
+            {currentUser ? (
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-full border border-blue-100 dark:border-blue-800">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-xs font-black">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <span className="text-xs font-black text-primary dark:text-blue-300 max-w-[100px] truncate">{currentUser.name}</span>
+                <button 
+                  onClick={logoutUser}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  title="Se déconnecter"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            ) : (
+                <button 
+                    onClick={() => smoothScrollTo('formation')}
+                    className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors rounded-full bg-white dark:bg-slate-900 shadow-md border dark:border-slate-800"
+                >
+                    <UserIcon size={22} />
+                </button>
+            )}
+
             <button
               onClick={toggleTheme}
-              className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors rounded-full"
+              className="p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors rounded-full bg-white dark:bg-slate-900 shadow-md border dark:border-slate-800"
             >
-              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
             </button>
 
             <button 
               onClick={() => setIsOpen(true)}
-              className="relative p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors rounded-full"
+              className="relative p-3 text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors rounded-full bg-white dark:bg-slate-900 shadow-md border dark:border-slate-800"
             >
-              <ShoppingCart size={20} />
+              <ShoppingCart size={22} />
               {items.length > 0 && (
-                <span className="absolute top-1 right-1 bg-secondary text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce shadow-sm">
+                <span className="absolute -top-1 -right-1 bg-[#F59E0B] text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-bounce">
                   {items.length}
                 </span>
               )}
@@ -99,39 +115,55 @@ const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Toggle */}
-        <div className="flex md:hidden items-center gap-2">
-          <button onClick={() => setIsOpen(true)} className="relative p-3">
-            <ShoppingCart size={22} className="text-slate-600 dark:text-slate-300" />
+        {/* Toggle Mobile */}
+        <div className="flex lg:hidden items-center gap-3">
+          <button onClick={() => setIsOpen(true)} className="relative p-3 bg-white dark:bg-slate-900 rounded-xl shadow-md border dark:border-slate-800">
+            <ShoppingCart size={24} className="text-slate-700 dark:text-slate-300" />
             {items.length > 0 && (
-              <span className="absolute top-1 right-1 bg-secondary text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-[#F59E0B] text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
                 {items.length}
               </span>
             )}
           </button>
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-3 text-slate-900 dark:text-white">
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-3 text-slate-900 dark:text-white bg-white dark:bg-slate-900 rounded-xl shadow-md border dark:border-slate-800">
             {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 shadow-xl p-6 space-y-4 animate-slideUp">
+        <div className="lg:hidden absolute top-full left-4 right-4 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 shadow-2xl rounded-3xl p-8 space-y-6 mt-4 animate-slideUp">
+          {currentUser && (
+            <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 mb-2">
+               <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white text-xl font-black">
+                  {currentUser.name.charAt(0)}
+               </div>
+               <div className="flex-1">
+                 <p className="font-black text-slate-800 dark:text-white">{currentUser.name}</p>
+                 <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
+               </div>
+               <button onClick={logoutUser} className="p-3 bg-red-50 text-red-500 rounded-xl">
+                 <LogOut size={20}/>
+               </button>
+            </div>
+          )}
           {navLinks.map((link) => (
             <a 
               key={link.name}
               href={link.href}
-              className="block font-bold text-lg text-slate-800 dark:text-slate-300 hover:text-blue-600"
-              onClick={(e) => scrollToSection(e, link.href)}
+              className="block font-black text-xl text-slate-800 dark:text-slate-300 hover:text-blue-600"
+              onClick={(e) => handleScroll(e, link.href)}
             >
               {link.name}
             </a>
           ))}
-          <button onClick={toggleTheme} className="w-full flex items-center justify-between py-4 border-t border-slate-50 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
-            <span>{theme === 'light' ? 'Mode Sombre' : 'Mode Clair'}</span>
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
+          <div className="pt-6 border-t dark:border-slate-800 space-y-4">
+            <button onClick={toggleTheme} className="w-full flex items-center justify-between font-black text-slate-600 dark:text-slate-400">
+                <span>{theme === 'light' ? 'Mode Sombre' : 'Mode Clair'}</span>
+                {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
+            </button>
+          </div>
         </div>
       )}
     </nav>

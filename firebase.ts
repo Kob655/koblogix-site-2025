@@ -3,7 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 /**
- * CONFIGURATION KOBLOGIX RÉELLE
+ * CONFIGURATION OFFICIELLE KOBLOGIX
  */
 const firebaseConfig = {
   apiKey: "AIzaSyCVKVZZCw87xrLyWkF1uJaqzJ1v_ZPCDf4",
@@ -14,26 +14,18 @@ const firebaseConfig = {
   appId: "1:1059133656016:web:684a56716bd086e6cc47d5"
 };
 
-// Détection automatique : Si la clé est valide, le mode cloud est activé
-export const isFirebaseConfigured = 
-  firebaseConfig.apiKey && 
-  firebaseConfig.apiKey.trim().length > 10;
+// Vérification de configuration
+export const isFirebaseConfigured = true; 
 
 let app;
-if (isFirebaseConfigured) {
-  try {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    console.log("✅ [SYNC CLOUD] Connecté au serveur KOBLOGIX.");
-  } catch (e) {
-    console.error("❌ [SYNC CLOUD] Erreur de connexion:", e);
-    app = { name: '[MOCK]', options: {} };
-  }
-} else {
-  console.warn("⚠️ [SYNC LOCAL] Les données restent sur cet appareil car Firebase n'est pas configuré.");
-  app = { name: '[MOCK]', options: {} };
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  console.log("🚀 [FIREBASE] Initialisé avec succès pour le projet : " + firebaseConfig.projectId);
+} catch (e) {
+  console.error("❌ [FIREBASE] Erreur d'initialisation:", e);
 }
 
-export const db = isFirebaseConfigured ? getFirestore(app as any) : null;
-export const storage = isFirebaseConfigured ? getStorage(app as any) : null;
+export const db = app ? getFirestore(app) : null;
+export const storage = app ? getStorage(app) : null;
 
 export default app;

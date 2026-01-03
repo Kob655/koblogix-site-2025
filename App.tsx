@@ -18,6 +18,7 @@ import Notifications from './components/Notifications';
 import SocialProof from './components/SocialProof';
 import BibtexGenerator from './components/BibtexGenerator';
 import Ambassador from './components/Ambassador';
+import AIAssistant from './components/AIAssistant'; // Ajout de l'import
 import RevealOnScroll from './components/ui/RevealOnScroll';
 import ScrollProgress from './components/ui/ScrollProgress';
 import { CartProvider } from './context/CartContext';
@@ -41,11 +42,15 @@ const AppContent: React.FC = () => {
   }, [setAdminOpen]);
 
   return (
-    <div className="font-sans text-[#2c3e50] dark:text-gray-100 antialiased scroll-smooth transition-colors duration-300 bg-[#fdfbf7] dark:bg-slate-900">
+    <div className="font-sans text-slate-900 dark:text-gray-100 antialiased scroll-smooth transition-colors duration-300 bg-[#fafafa] dark:bg-slate-950">
       <ScrollProgress />
       <Navbar />
       <Notifications />
       <SocialProof />
+      
+      {/* Assistant IA Flottant */}
+      <AIAssistant />
+
       <main>
         <Hero />
         

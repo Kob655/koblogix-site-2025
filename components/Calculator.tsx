@@ -1,15 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Calculator as CalcIcon, ShoppingCart, Check, Loader2 } from 'lucide-react';
-import { BASE_PRICES, PER_PAGE_PRICES, USD_RATE } from '../constants';
+import { Calculator as CalcIcon, ShoppingCart, Loader2, DollarSign, Check } from 'lucide-react';
+import { BASE_PRICES, PER_PAGE_PRICES, USD_RATE, formatPriceFCFA, formatPriceUSD } from '../constants';
 import { useCart } from '../context/CartContext';
-import { formatPrice } from '../utils';
 
 const Calculator: React.FC = () => {
   const { addToCart } = useCart();
   const [serviceType, setServiceType] = useState('rapport');
   const [pages, setPages] = useState(10);
   const [delai, setDelai] = useState('normal');
-  const [correction, setCorrection] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const breakdown = useMemo(() => {
@@ -22,149 +20,130 @@ const Calculator: React.FC = () => {
     if (delai === 'express') multiplier = 1.5;
     
     const urgencyFee = (subtotal * multiplier) - subtotal;
-    const correctionFee = correction ? 3000 : 0;
-    
-    const totalRaw = subtotal + urgencyFee + correctionFee;
-    const total = Math.round(totalRaw / 500) * 500; // Rounding
+    const totalRaw = subtotal + urgencyFee;
+    const total = Math.round(totalRaw / 500) * 500;
 
-    return { base, pageCost, urgencyFee, correctionFee, total };
-  }, [serviceType, pages, delai, correction]);
+    return { base, pageCost, urgencyFee, total };
+  }, [serviceType, pages, delai]);
 
   const handleAddToCart = async () => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 600)); // Simulate network
-    
+    await new Promise(resolve => setTimeout(resolve, 800));
     addToCart({
       name: `Devis ${serviceType.toUpperCase()}`,
       price: breakdown.total,
       type: 'custom',
-      details: `${pages} pages - Délai ${delai} - ${correction ? 'Avec Correction' : 'Sans Correction'}`
+      details: `${pages} pages - Délai ${delai}`
     });
     setIsLoading(false);
   };
 
   return (
-    <section id="calculateur" className="py-20 bg-bg dark:bg-slate-900 transition-colors duration-300">
-      <div className="container mx-auto px-4 max-w-5xl">
-        <div className="text-center mb-12">
-           <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4 text-dark dark:text-white relative inline-block">
-            <CalcIcon className="inline-block mr-2 text-primary" size={36} />
-            Simulateur de Devis
+    <section id="calculateur" className="py-24 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="text-center mb-16">
+          <span className="text-primary font-bold tracking-widest uppercase text-sm mb-2 block">Estimation instantanée</span>
+          <h2 className="text-4xl md:text-5xl font-black font-serif text-dark dark:text-white mb-4">
+            Simulateur de <span className="text-primary">Tarification</span>
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">Estimation précise et immédiate</p>
+          <p className="text-gray-500 max-w-xl mx-auto italic">Obtenez un devis immédiat pour votre projet de rédaction scientifique.</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors duration-300">
+        <div className="bg-white dark:bg-slate-800 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-gray-100 dark:border-slate-700">
           
-          {/* Form Side */}
-          <div className="p-8 md:p-12 md:w-3/5 space-y-6">
-            <div>
-              <label className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Type de document</label>
+          <div className="p-10 lg:p-16 lg:w-3/5 space-y-10">
+            {/* Nature du projet */}
+            <div className="space-y-4">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                <Check size={14} className="text-primary"/> Type de service
+              </label>
               <select 
-                className="w-full p-4 bg-gray-50 dark:bg-slate-700 border-none rounded-xl font-bold text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-primary outline-none transition-colors"
+                className="w-full p-5 bg-gray-50 dark:bg-slate-700 border-2 border-gray-100 dark:border-slate-600 rounded-2xl font-bold text-lg cursor-pointer transition-all focus:border-primary"
                 value={serviceType}
                 onChange={(e) => setServiceType(e.target.value)}
               >
-                <option value="cv">CV Professionnel</option>
                 <option value="rapport">Rapport de Stage</option>
                 <option value="memoire">Mémoire de Master</option>
-                <option value="poster">Poster Scientifique</option>
-                <option value="presentation">Présentation Beamer</option>
+                <option value="presentation">Soutenance Beamer</option>
+                <option value="tikz">Schéma TikZ / Graphique</option>
+                <option value="cv">CV LaTeX Premium</option>
+                <option value="traduction">Traduction Scientifique</option>
               </select>
             </div>
 
-            <div>
-              <div className="flex justify-between mb-2">
-                <label className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase">Volume</label>
-                <span className="font-bold text-primary">{pages} Pages/Slides</span>
+            {/* Volume */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Check size={14} className="text-primary"/> Volume estimé (Pages / Schémas)
+                </label>
+                <span className="bg-primary/10 text-primary px-6 py-2 rounded-full font-black text-xl">{pages}</span>
               </div>
               <input 
                 type="range" min="1" max="100" 
                 value={pages} 
                 onChange={(e) => setPages(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="w-full h-3 bg-gray-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-primary"
               />
             </div>
 
-             <div>
-              <label className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Urgence</label>
-              <div className="grid grid-cols-3 gap-3">
+            {/* Délai */}
+            <div className="space-y-4">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                <Check size={14} className="text-primary"/> Urgence de livraison
+              </label>
+              <div className="grid grid-cols-3 gap-4">
                 {['normal', 'rapide', 'express'].map((d) => (
                   <button
                     key={d}
                     onClick={() => setDelai(d)}
-                    className={`py-3 rounded-lg text-sm font-bold capitalize transition-colors ${delai === d ? 'bg-primary text-white shadow-md' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+                    className={`py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${delai === d ? 'bg-primary text-white shadow-xl scale-105' : 'bg-gray-100 dark:bg-slate-700 text-gray-400 hover:bg-gray-200 border-2 border-transparent'}`}
                   >
                     {d}
                   </button>
                 ))}
               </div>
             </div>
-            
-            <div 
-              onClick={() => setCorrection(!correction)}
-              className={`p-4 rounded-xl border-2 cursor-pointer flex items-center justify-between transition-all ${correction ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-slate-600'}`}
-            >
-               <span className="font-bold text-gray-700 dark:text-gray-300">Option Correction (+3000F)</span>
-               <div className={`w-6 h-6 rounded border flex items-center justify-center ${correction ? 'bg-primary border-primary text-white' : 'border-gray-400 dark:border-gray-500'}`}>
-                 {correction && <Check size={14} />}
-               </div>
-            </div>
           </div>
 
-          {/* Result Side */}
-          <div className="bg-primary dark:bg-blue-900 text-white p-8 md:p-12 md:w-2/5 flex flex-col justify-center items-center relative overflow-hidden transition-colors">
-             <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+          <div className="bg-slate-950 p-10 lg:p-16 lg:w-2/5 flex flex-col justify-center items-center text-white relative">
+             <div className="absolute top-0 right-0 p-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
              
-             <h3 className="text-white/80 font-serif text-lg mb-4 text-center">Estimation Totale</h3>
-             <div className="text-5xl font-black mb-2 tracking-tight text-center">
-               {breakdown.total.toLocaleString('fr-FR')}
-             </div>
-             <div className="text-xl text-white/60 font-light mb-2 text-center">FCFA</div>
-             
-             {/* USD Display */}
-             <div className="bg-white/10 px-4 py-1.5 rounded-lg text-sm font-bold text-white mb-8">
-                ≈ {Math.ceil(breakdown.total / USD_RATE)} $ USD
-             </div>
+             <div className="relative z-10 text-center space-y-8 w-full">
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4">Total Estimé du Devis</p>
+                    <div className="text-5xl lg:text-6xl font-black text-primary flex items-center justify-center gap-1">
+                      {formatPriceFCFA(breakdown.total)}
+                    </div>
+                    <div className="text-lg font-bold text-white opacity-40">≈ {formatPriceUSD(breakdown.total)}</div>
+                </div>
 
-             {/* Detailed Breakdown */}
-             <div className="w-full text-sm text-white/80 space-y-2 mb-8 bg-black/10 p-4 rounded-xl backdrop-blur-sm">
-               <div className="flex justify-between">
-                 <span>Prix de base</span>
-                 <span>{formatPrice(breakdown.base)}</span>
-               </div>
-               {breakdown.pageCost > 0 && (
-                 <div className="flex justify-between">
-                   <span>Pages supp.</span>
-                   <span>+ {formatPrice(breakdown.pageCost)}</span>
-                 </div>
-               )}
-               {breakdown.urgencyFee > 0 && (
-                  <div className="flex justify-between text-yellow-300">
-                    <span>Majoration Urgence</span>
-                    <span>+ {formatPrice(breakdown.urgencyFee)}</span>
-                  </div>
-               )}
-               {breakdown.correctionFee > 0 && (
-                  <div className="flex justify-between">
-                    <span>Correction</span>
-                    <span>+ {formatPrice(breakdown.correctionFee)}</span>
-                  </div>
-               )}
-             </div>
+                <div className="py-6 border-y border-white/5 space-y-4">
+                   <div className="flex justify-between text-[11px] font-medium text-gray-500">
+                     <span>Frais de base</span>
+                     <span className="text-white font-bold">{formatPriceFCFA(breakdown.base)}</span>
+                   </div>
+                   <div className="flex justify-between text-[11px] font-medium text-gray-500">
+                     <span>Volume ({pages} p.)</span>
+                     <span className="text-white font-bold">{formatPriceFCFA(breakdown.pageCost)}</span>
+                   </div>
+                   {breakdown.urgencyFee > 0 && (
+                     <div className="flex justify-between text-[11px] font-black text-blue-400">
+                       <span>Supplément {delai}</span>
+                       <span>+ {formatPriceFCFA(breakdown.urgencyFee)}</span>
+                     </div>
+                   )}
+                </div>
 
-             <div className="space-y-4 w-full relative z-10">
-               <button 
-                 onClick={handleAddToCart}
-                 disabled={isLoading}
-                 className="w-full bg-white text-primary dark:text-blue-900 py-4 rounded-xl font-bold shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2 disabled:opacity-80 disabled:cursor-not-allowed"
-               >
-                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <ShoppingCart size={20} />}
-                 {isLoading ? 'Ajout...' : 'Ajouter au devis'}
-               </button>
-               <p className="text-xs text-white/50 px-4 text-center">
-                 *Ce montant est une estimation. Le prix final sera confirmé après analyse.
-               </p>
+                <button 
+                  onClick={handleAddToCart}
+                  disabled={isLoading}
+                  className="w-full bg-primary hover:bg-primary-light text-white py-6 rounded-2xl font-black shadow-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 hover:scale-[1.02] active:scale-95 group"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" size={24} /> : <ShoppingCart size={24} className="group-hover:rotate-12 transition-transform"/>}
+                  AJOUTER AU PANIER
+                </button>
+                <p className="text-[10px] text-gray-600 italic opacity-60">Paiement unique • Accès source LaTeX inclus</p>
              </div>
           </div>
         </div>

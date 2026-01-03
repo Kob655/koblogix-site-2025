@@ -1,22 +1,20 @@
 export const WHATSAPP_SUPPORT = '22898286541';
-export const USD_RATE = 600;
+export const FLOOZ_NUMBER = '+228 98 28 65 41';
+export const TMONEY_NUMBER = '+228 92 10 16 04';
+export const USD_RATE = 600; // 1$ = 600 FCFA
+export const EUR_RATE = 650;
+
+export const formatPriceFCFA = (amount: number) => amount.toLocaleString('fr-FR') + ' FCFA';
+export const formatPriceUSD = (amount: number) => (amount / USD_RATE).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+// Fonction globale pour afficher les deux prix avec accent GÉANT sur le Dollar
+export const formatDualPrice = (amount: number) => `${formatPriceUSD(amount)} / ${formatPriceFCFA(amount)}`;
 
 export const SESSIONS_DATA = [
-  // JANVIER
   { id: 'jan-1', title: 'SESSION 1', dates: '5-9 Janvier 2026', total: 15, available: 15 },
   { id: 'jan-2', title: 'SESSION 2', dates: '19-23 Janvier 2026', total: 15, available: 15 },
-  
-  // FÉVRIER
   { id: 'feb-1', title: 'SESSION 3', dates: '2-6 Février 2026', total: 15, available: 15 },
   { id: 'feb-2', title: 'SESSION 4', dates: '16-20 Février 2026', total: 15, available: 15 },
-  
-  // MARS
-  { id: 'mar-1', title: 'SESSION 5', dates: '2-6 Mars 2026', total: 15, available: 15 },
-  { id: 'mar-2', title: 'SESSION 6', dates: '16-20 Mars 2026', total: 15, available: 15 },
-  
-  // AVRIL
-  { id: 'apr-1', title: 'SESSION 7', dates: '30 Mars - 3 Avril 2026', total: 15, available: 15 },
-  { id: 'apr-2', title: 'SESSION 8', dates: '13-17 Avril 2026', total: 15, available: 15 },
 ];
 
 export const SERVICES_DATA = [
@@ -76,7 +74,11 @@ export const BASE_PRICES: Record<string, number> = {
   poster: 15000,
   memoire: 30000,
   presentation: 8000,
-  projet: 20000
+  projet: 20000,
+  tikz: 7500,
+  traduction: 15000,
+  plagiat: 25000,
+  thesis_pack: 45000
 };
 
 export const PER_PAGE_PRICES: Record<string, number> = {
@@ -85,5 +87,8 @@ export const PER_PAGE_PRICES: Record<string, number> = {
   poster: 0,
   memoire: 1000,
   presentation: 300,
-  projet: 700
+  projet: 700,
+  traduction: 2000,
+  plagiat: 1500,
+  thesis_pack: 1000
 };

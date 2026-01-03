@@ -1,10 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { SessionInfo, Transaction, Notification, User } from '../types';
 import { SESSIONS_DATA as INITIAL_SESSIONS } from '../constants';
-import { db, isFirebaseConfigured } from '../firebase'; 
+import { db } from '../firebase'; 
 import { 
-  collection, doc, addDoc, updateDoc, setDoc, onSnapshot, query, orderBy, Timestamp, getDocs, where, increment
+  collection, doc, addDoc, updateDoc, setDoc, onSnapshot, query, orderBy, Timestamp, deleteDoc
 } from 'firebase/firestore';
 
 interface GlobalResources {
@@ -55,11 +54,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return saved ? JSON.parse(saved) : INITIAL_SESSIONS;
   });
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('koblogix_transactions');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('koblogix_users');
     return saved ? JSON.parse(saved) : [];
@@ -74,41 +69,34 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [globalResources, setGlobalResources] = useState<GlobalResources>({});
   const [isAdminOpen, setAdminOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isCloudSync, setIsCloudSync] = useState(isFirebaseConfigured);
+  const [isCloudSync, setIsCloudSync] = useState(false);
 
+  // ÉCOUTE EN TEMPS RÉEL (CRITIQUE pour le Panel Admin multi-appareil)
   useEffect(() => {
-    localStorage.setItem('koblogix_sessions', JSON.stringify(sessions));
-    localStorage.setItem('koblogix_transactions', JSON.stringify(transactions));
-    localStorage.setItem('koblogix_users', JSON.stringify(users));
-    if (currentUser) localStorage.setItem('koblogix_current_user', JSON.stringify(currentUser));
-    else localStorage.removeItem('koblogix_current_user');
-  }, [sessions, transactions, users, currentUser]);
-
-  // Synchronisation en temps réel avec Firebase
-  useEffect(() => {
-    if (!isFirebaseConfigured || !db) return;
-
-    try {
-      // Écouter les commandes (Transactions)
-      const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-      const unsubOrders = onSnapshot(qOrders, (s) => {
-        const cloudData = s.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
-        if (cloudData.length > 0) setTransactions(cloudData);
-      });
-
-      const unsubSessions = onSnapshot(collection(db, "sessions"), (s) => {
-        if (!s.empty) setSessions(s.docs.map(d => d.data() as SessionInfo));
-      });
-
-      const unsubSettings = onSnapshot(doc(db, "settings", "global"), (d) => {
-        if(d.exists()) setGlobalResources(d.data());
-      });
-
-      return () => { unsubOrders(); unsubSessions(); unsubSettings(); };
-    } catch (e) {
-      console.error("Erreur de synchronisation Cloud:", e);
+    if (!db) return;
+    
+    // On écoute la collection "orders" en temps réel sur tout le Cloud
+    const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+      setIsCloudSync(true);
+      const cloudData = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        date: doc.data().createdAt?.toDate().toISOString().split('T')[0] || doc.data().date
+      } as Transaction));
+      
+      console.log("🔥 [CloudSync] Mise à jour des commandes :", cloudData.length);
+      setTransactions(cloudData);
+    }, (error) => {
+      console.error("❌ Erreur de synchronisation Cloud :", error);
       setIsCloudSync(false);
-    }
+    });
+
+    const unsubSettings = onSnapshot(doc(db, "settings", "global"), (d) => {
+      if(d.exists()) setGlobalResources(d.data());
+    });
+
+    return () => { unsubOrders(); unsubSettings(); };
   }, []);
 
   const addNotification = (message: string, type: 'success' | 'error' | 'info') => {
@@ -119,8 +107,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addTransaction = async (t: Omit<Transaction, 'id' | 'status' | 'date'>) => {
     const dateStr = new Date().toISOString().split('T')[0];
-    
-    if (isFirebaseConfigured && db) {
+    if (db) {
       try {
         await addDoc(collection(db, "orders"), {
           ...t,
@@ -129,116 +116,80 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           createdAt: Timestamp.now(),
           isCompleted: false
         });
-        addNotification("Commande enregistrée sur le cloud.", "success");
-      } catch (error) {
-        console.error("Erreur d'envoi Cloud:", error);
-        addNotification("Erreur Cloud. Commande enregistrée localement uniquement.", "error");
-        // Fallback local en cas d'erreur cloud
-        const newT = { ...t as any, id: Date.now().toString(), status: 'pending', date: dateStr };
-        setTransactions(prev => [newT, ...prev]);
+        addNotification("Transaction envoyée au Cloud !", "success");
+      } catch (error: any) {
+        console.error("Firebase Add Error:", error);
+        addNotification("Erreur Cloud. Commande non enregistrée.", "error");
+        throw error;
       }
-    } else {
-      // Mode 100% Local
-      const newT = { ...t as any, id: Date.now().toString(), status: 'pending', date: dateStr };
-      setTransactions(prev => [newT, ...prev]);
-      addNotification("Enregistré sur cet appareil (Mode Hors-ligne).", "info");
     }
   };
 
-  const updateTransactionStatus = async (id: string, status: 'approved' | 'rejected') => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'KOB-';
-    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-    
-    if (isFirebaseConfigured && db) {
-      try {
-        const orderRef = doc(db, "orders", id);
-        await updateDoc(orderRef, { 
-          status, 
-          code: status === 'approved' ? code : null,
-          codeExpiresAt: Date.now() + (48 * 60 * 60 * 1000)
-        });
-      } catch(e) { console.error(e); }
-    } else {
-      setTransactions(prev => prev.map(t => 
-        t.id === id ? { ...t, status, code: status === 'approved' ? code : undefined } : t
-      ));
-    }
-    addNotification(`Commande mise à jour.`, "info");
+  const logoutUser = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('koblogix_current_user');
   };
 
-  const toggleCompletion = async (id: string) => {
-    const t = transactions.find(x => x.id === id);
-    if (!t) return;
-    const newStatus = !t.isCompleted;
-
-    if (isFirebaseConfigured && db) {
-      await updateDoc(doc(db, "orders", id), { isCompleted: newStatus });
-    } else {
-      setTransactions(prev => prev.map(item => item.id === id ? { ...item, isCompleted: newStatus } : item));
-    }
-  };
-
-  const deleteTransaction = async (id: string) => {
-    if (isFirebaseConfigured && db) {
-        // Optionnel : supprimer aussi sur Firebase, mais souvent on préfère garder une trace
-        // Pour cet exemple on filtre simplement le state local
-    }
-    setTransactions(prev => prev.filter(t => t.id !== id));
-  };
-
-  const verifyCoupon = async (code: string) => {
-    const localAmbassador = users.find(u => u.ambassadorCode === code.toUpperCase());
-    if (localAmbassador) return { valid: true, ambassadorId: localAmbassador.id };
-    return { valid: false };
-  };
-
-  const becomeAmbassador = async (code: string) => {
-    if (!currentUser) return;
-    const updated = { ...currentUser, isAmbassador: true, ambassadorCode: code.toUpperCase(), balance: 0 };
-    setCurrentUser(updated);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
-    addNotification("Programme ambassadeur activé !", "success");
-  };
-
-  const registerUser = (u: any) => {
-    const newUser = { ...u, id: Date.now().toString(), registeredAt: new Date().toISOString(), balance: 0 };
-    setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
-    addNotification("Profil créé !", "success");
-  };
-
-  const loginUser = (email: string, pass: string) => {
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
-    if (user) {
-      setCurrentUser(user);
-      addNotification(`Heureux de vous revoir !`, "success");
-      return true;
+  const loginUser = (e: string, p: string) => {
+    const u = users.find(x => x.email.toLowerCase() === e.toLowerCase() && x.password === p);
+    if (u) { 
+      setCurrentUser(u); 
+      localStorage.setItem('koblogix_current_user', JSON.stringify(u));
+      return true; 
     }
     return false;
   };
 
-  const clearTransactions = async () => { setTransactions([]); };
-  const regenerateCode = async (id: string) => { 
-     const code = 'KOB-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-     if (isFirebaseConfigured && db) await updateDoc(doc(db, "orders", id), { code });
-  };
-  const resetSessionSeats = async (id: string) => { 
-     if (isFirebaseConfigured && db) await updateDoc(doc(db, "sessions", id), { available: 15 });
-  };
-  const updateServiceProgress = async (id: string, progress: number, file?: any) => {
-     if (isFirebaseConfigured && db) await updateDoc(doc(db, "orders", id), { serviceProgress: progress, deliveredFile: file });
+  const registerUser = (u: any) => {
+    const newUser = { ...u, id: Date.now().toString(), registeredAt: new Date().toISOString(), balance: 0 };
+    setUsers(prev => {
+        const updated = [...prev, newUser];
+        localStorage.setItem('koblogix_users', JSON.stringify(updated));
+        return updated;
+    });
+    setCurrentUser(newUser);
+    localStorage.setItem('koblogix_current_user', JSON.stringify(newUser));
   };
 
   return (
     <StoreContext.Provider value={{ 
       sessions, transactions, notifications, users, currentUser, isAdminOpen, adminPassword, globalResources, isCloudSync,
-      setAdminOpen, updateAdminPassword: async (p) => setAdminPassword(p), saveAllGlobalResources: async (d) => setGlobalResources(d),
-      addTransaction, updateTransactionStatus, deleteTransaction, 
-      addNotification, removeNotification: (id) => setNotifications(n => n.filter(x => x.id !== id)),
+      setAdminOpen, updateAdminPassword: async (p) => setAdminPassword(p), 
+      saveAllGlobalResources: async (d) => {
+        if (db) await setDoc(doc(db, "settings", "global"), d);
+        setGlobalResources(d);
+      },
+      addTransaction, 
+      updateTransactionStatus: async (id, status) => {
+        if (db) await updateDoc(doc(db, "orders", id), { status });
+      }, 
+      deleteTransaction: async (id) => {
+        if (db) await deleteDoc(doc(db, "orders", id));
+      }, 
+      addNotification, 
+      removeNotification: (id) => setNotifications(n => n.filter(x => x.id !== id)),
       updateSession: async (id, data) => setSessions(prev => prev.map(s => s.id === id ? {...s, ...data} : s)), 
-      registerUser, loginUser, logoutUser: () => setCurrentUser(null),
-      becomeAmbassador, verifyCoupon, toggleCompletion, clearTransactions, regenerateCode, resetSessionSeats, updateServiceProgress
+      registerUser, loginUser, logoutUser,
+      becomeAmbassador: async (code) => {
+        if (!currentUser) return;
+        const updated = { ...currentUser, isAmbassador: true, ambassadorCode: code, balance: 0 };
+        setCurrentUser(updated);
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+      }, 
+      verifyCoupon: async (code) => {
+        const ambassador = users.find(u => u.ambassadorCode === code.toUpperCase());
+        return { valid: !!ambassador, ambassadorId: ambassador?.id };
+      }, 
+      toggleCompletion: async (id) => {
+        const t = transactions.find(x => x.id === id);
+        if (t && db) await updateDoc(doc(db, "orders", id), { isCompleted: !t.isCompleted });
+      }, 
+      clearTransactions: async () => {}, 
+      regenerateCode: async (id) => {}, 
+      resetSessionSeats: async (id) => {}, 
+      updateServiceProgress: async (id, p, f) => {
+        if (db) await updateDoc(doc(db, "orders", id), { serviceProgress: p, deliveredFile: f });
+      }
     }}>
       {children}
     </StoreContext.Provider>

@@ -21,7 +21,7 @@ const RevealOnScroll: React.FC<RevealOnScrollProps> = ({ children, width = '100%
       },
       {
         root: null,
-        rootMargin: '100px 0px 100px 0px', // On déclenche un peu avant pour éviter l'effet "vide"
+        rootMargin: '150px 0px 150px 0px', // On déclenche bien avant
         threshold: 0, 
       }
     );
@@ -42,7 +42,7 @@ const RevealOnScroll: React.FC<RevealOnScrollProps> = ({ children, width = '100%
       ref={ref}
       style={{ width }}
       className={`transition-all duration-1000 ease-out transform ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
+        isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
       }`}
     >
       {children}

@@ -1,4 +1,3 @@
-
 export interface ServiceItem {
   id: string;
   title: string;
@@ -24,9 +23,10 @@ export interface Transaction {
   name: string;
   phone: string;
   email: string;
-  method: 'tmoney' | 'flooz';
+  method: 'tmoney' | 'flooz' | 'card' | 'paypal';
   paymentRef?: string;
   amount: number;
+  currency?: 'XOF' | 'USD' | 'EUR';
   type: string; 
   notes?: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -36,8 +36,8 @@ export interface Transaction {
   codeExpiresAt?: number;
   items: CartItem[];
   serviceProgress?: number;
-  couponUsed?: string; // Code promo utilisé
-  ambassadorId?: string; // ID de l'ambassadeur lié
+  couponUsed?: string; 
+  ambassadorId?: string; 
   uploadedContractUrl?: string;
   deliveredFile?: {
     name: string;
@@ -54,19 +54,10 @@ export interface User {
   registeredAt: string;
   isAmbassador?: boolean;
   ambassadorCode?: string;
-  balance: number; // Solde des commissions
+  balance: number; 
   withdrawals?: { amount: number, date: string, status: string }[];
 }
 
-export interface CustomerInfo {
-  name: string;
-  phone: string;
-  email: string;
-  paymentMethod: 'tmoney' | 'flooz';
-  paymentRef: string;
-}
-
-// Fixed missing SessionInfo interface
 export interface SessionInfo {
   id: string;
   title: string;
@@ -75,7 +66,6 @@ export interface SessionInfo {
   available: number;
 }
 
-// Fixed missing Notification interface
 export interface Notification {
   id: string;
   message: string;
